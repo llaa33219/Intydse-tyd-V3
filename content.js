@@ -21,6 +21,22 @@
   let temporaryCommentStickerItem = null;
   
   // State variables
+
+// --- Added by Enhancer Patch 2025-04-18 ---
+// Prevent duplicate loading and ensure tokens are ready before fetching
+let isLoadingMorePosts = false;
+
+async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
+  if (csrfToken && xToken) return true;
+  for (let i = 0; i < maxRetries; i++) {
+    extractTokens();
+    if (csrfToken && xToken) return true;
+    await new Promise(r => setTimeout(r, retryDelay));
+  }
+  console.error('Tokens still unavailable after retries');
+  return false;
+}
+// --- End Patch ---
   let csrfToken = '';
   let xToken = '';
   let userId = '';
@@ -2597,11 +2613,15 @@ tabElements.forEach(tabElement => {
     try {
       if (!element || !document.contains(element)) return;
       
+      
       // 내용 업데이트
       const contentElement = findPostContent(element);
       if (contentElement && contentElement.textContent !== post.content) {
-        await safeSetTextContent(contentElement, post.content);
-      }
+        const newHTML = safeHTMLWithLinks(post.content || '');
+if (contentElement.innerHTML !== newHTML) {
+  await safeSetInnerHTML(contentElement, newHTML);
+}
+}
       
       // 좋아요 수와 상태 업데이트
       const likesElement = safeQuerySelector('.like', element);
@@ -2732,18 +2752,9 @@ tabElements.forEach(tabElement => {
         }
       }
       
-      // 삭제된 게시글 제거
-      for (const [postId, element] of existingPostsMap.entries()) {
-        try {
-          if (!currentPostIds.has(postId) && !element.classList.contains('more-section')) {
-            await safeRemoveElement(element);
-          }
-        } catch (error) {
-          console.error('Error removing post:', error);
-        }
-      }
-      
-      // 여기서 게시글 제거 로직이 있었지만 제거되었습니다
+
+      // 게시글 제거 로직 제거됨
+
     } catch (error) {
       console.error('Error in updatePosts:', error);
     }
@@ -2852,13 +2863,12 @@ tabElements.forEach(tabElement => {
   // 더 많은 게시글 로드
   async function loadMorePosts() {
     try {
+    if (isLoadingMorePosts) return;
+    isLoadingMorePosts = true;
       if (!currentSearchAfter) return;
       
-      if (!csrfToken || !xToken) {
-        console.log('Tokens not ready yet, extracting again...');
-        extractTokens();
-        return;
-      }
+      const tokensOk = await ensureTokensReady();
+      if (!tokensOk) { isLoadingMorePosts = false; return; }
 
       const requestOptions = {
         method: "POST",
@@ -3071,6 +3081,9 @@ tabElements.forEach(tabElement => {
         console.log('Network error detected - trying to re-initialize...');
         extractTokens();
       }
+    }
+finally {
+      isLoadingMorePosts = false;
     }
   }
 
@@ -3617,8 +3630,11 @@ tabElements.forEach(tabElement => {
       // 내용 업데이트
       const contentElement = safeQuerySelector('.css-6wq60h', element);
       if (contentElement && contentElement.textContent !== comment.content) {
-        await safeSetTextContent(contentElement, comment.content);
-      }
+        const newHTML = safeHTMLWithLinks(comment.content || '');
+if (contentElement.innerHTML !== newHTML) {
+  await safeSetInnerHTML(contentElement, newHTML);
+}
+}
       
       // 좋아요 수와 상태 업데이트
       const likesElement = safeQuerySelector('.like', element);
@@ -3735,12 +3751,12 @@ tabElements.forEach(tabElement => {
   // 더 많은 댓글 로드
   async function loadMoreComments(postItem, postId) {
     try {
+    if (activeCommentThreads[postId]?.isLoading) return;
+    activeCommentThreads[postId].isLoading = true;
       if (!(postId in activeCommentThreads) || !activeCommentThreads[postId].searchAfter) return;
       
-      if (!csrfToken || !xToken) {
-        console.error('Tokens not available for loadMoreComments');
-        return;
-      }
+      const tokensOk = await ensureTokensReady();
+      if (!tokensOk) { activeCommentThreads[postId].isLoading = false; return; }
       
       const response = await fetch("https://playentry.org/graphql/SELECT_COMMENTS", {
         method: "POST",
@@ -3928,6 +3944,9 @@ tabElements.forEach(tabElement => {
       }
     } catch (error) {
       console.error('Error loading more comments:', error);
+    }
+finally {
+      if (activeCommentThreads[postId]) activeCommentThreads[postId].isLoading = false;
     }
   }
 

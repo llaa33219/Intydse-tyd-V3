@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "엔트리-Intydse tyd NEXT",
+  "name": "엔트리-Intydse tyd V3",
   "version": "1.0",
   "description": "엔트리 이야기를 실시간으로 업데이트해 줍니다.",
   "permissions": ["activeTab"],

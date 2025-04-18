@@ -21,6 +21,22 @@
   let temporaryCommentStickerItem = null;
   
   // State variables
+
+// --- Added by Enhancer Patch 2025-04-18 ---
+// Prevent duplicate loading and ensure tokens are ready before fetching
+let isLoadingMorePosts = false;
+
+async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
+  if (csrfToken && xToken) return true;
+  for (let i = 0; i < maxRetries; i++) {
+    extractTokens();
+    if (csrfToken && xToken) return true;
+    await new Promise(r => setTimeout(r, retryDelay));
+  }
+  console.error('Tokens still unavailable after retries');
+  return false;
+}
+// --- End Patch ---
   let csrfToken = '';
   let xToken = '';
   let userId = '';
@@ -962,22 +978,35 @@ tabElements.forEach(tabElement => {
       }
     });
   }
-
-  // Helper function for fetching with retries
+  
+  // 개선된 fetchWithRetry 함수
   async function fetchWithRetry(url, options, retryCount = 0) {
     try {
+      // 요청 시도
       const response = await fetch(url, options);
-      fetchRetryCount = 0;
+      fetchRetryCount = 0; // 성공 시 카운터 초기화
       return response;
     } catch (error) {
       console.error(`Fetch error (attempt ${retryCount + 1}/${MAX_FETCH_RETRIES}):`, error);
       
+      // 재시도 횟수가 최대치보다 적으면 재시도
       if (retryCount < MAX_FETCH_RETRIES) {
-        console.log(`Retrying fetch in ${FETCH_RETRY_DELAY}ms...`);
-        await new Promise(resolve => setTimeout(resolve, FETCH_RETRY_DELAY));
+        // 지수 백오프: 재시도마다 대기 시간 증가
+        const delay = FETCH_RETRY_DELAY * Math.pow(1.5, retryCount);
+        console.log(`Retrying fetch in ${delay}ms...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // 오류 유형에 따른 특별 처리
+        if (error.message && error.message.includes('NetworkError')) {
+          console.warn('NetworkError detected. Check internet connection.');
+        }
+        
+        // 재시도
         return fetchWithRetry(url, options, retryCount + 1);
       }
       
+      // 모든 재시도 실패 후 원래 오류 발생
       throw error;
     }
   }
@@ -2719,18 +2748,9 @@ tabElements.forEach(tabElement => {
         }
       }
       
-      // 삭제된 게시글 제거
-      for (const [postId, element] of existingPostsMap.entries()) {
-        try {
-          if (!currentPostIds.has(postId) && !element.classList.contains('more-section')) {
-            await safeRemoveElement(element);
-          }
-        } catch (error) {
-          console.error('Error removing post:', error);
-        }
-      }
-      
-      // 여기서 게시글 제거 로직이 있었지만 제거되었습니다
+
+      // 게시글 제거 로직 제거됨
+
     } catch (error) {
       console.error('Error in updatePosts:', error);
     }
@@ -2839,13 +2859,12 @@ tabElements.forEach(tabElement => {
   // 더 많은 게시글 로드
   async function loadMorePosts() {
     try {
+    if (isLoadingMorePosts) return;
+    isLoadingMorePosts = true;
       if (!currentSearchAfter) return;
       
-      if (!csrfToken || !xToken) {
-        console.log('Tokens not ready yet, extracting again...');
-        extractTokens();
-        return;
-      }
+      const tokensOk = await ensureTokensReady();
+      if (!tokensOk) { isLoadingMorePosts = false; return; }
 
       const requestOptions = {
         method: "POST",
@@ -3058,6 +3077,9 @@ tabElements.forEach(tabElement => {
         console.log('Network error detected - trying to re-initialize...');
         extractTokens();
       }
+    }
+finally {
+      isLoadingMorePosts = false;
     }
   }
 
@@ -3722,12 +3744,12 @@ tabElements.forEach(tabElement => {
   // 더 많은 댓글 로드
   async function loadMoreComments(postItem, postId) {
     try {
+    if (activeCommentThreads[postId]?.isLoading) return;
+    activeCommentThreads[postId].isLoading = true;
       if (!(postId in activeCommentThreads) || !activeCommentThreads[postId].searchAfter) return;
       
-      if (!csrfToken || !xToken) {
-        console.error('Tokens not available for loadMoreComments');
-        return;
-      }
+      const tokensOk = await ensureTokensReady();
+      if (!tokensOk) { activeCommentThreads[postId].isLoading = false; return; }
       
       const response = await fetch("https://playentry.org/graphql/SELECT_COMMENTS", {
         method: "POST",
@@ -3915,6 +3937,9 @@ tabElements.forEach(tabElement => {
       }
     } catch (error) {
       console.error('Error loading more comments:', error);
+    }
+finally {
+      if (activeCommentThreads[postId]) activeCommentThreads[postId].isLoading = false;
     }
   }
 

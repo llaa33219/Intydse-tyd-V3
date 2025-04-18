@@ -6,8 +6,8 @@
   const MAX_POSTS_TO_DISPLAY = 50;
   const FETCH_RETRY_DELAY = 1000; // 1초로 줄임
   const MAX_FETCH_RETRIES = 3;
-  const DOM_OPERATION_DELAY = 20; // 20ms로 줄임
-  const MUTATION_THROTTLE = 100; // 100ms로 줄임
+  const DOM_OPERATION_DELAY = 0; // 20ms로 줄임
+  const MUTATION_THROTTLE = 0; // 100ms로 줄임
 
   // 스티커 관련 상태 변수
   let stickerTabs = [];
@@ -737,6 +737,87 @@ tabElements.forEach(tabElement => {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+  // 텍스트에서 URL을 감지하고 <a> 태그로 변환하는 함수
+  function safeHTMLWithLinks(unsafeText) {
+    if (typeof unsafeText !== 'string') return '';
+    
+    // 먼저 텍스트를 안전하게 이스케이프
+    const safeText = unsafeText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    // convertLinks 함수와 유사한 정규식 (다국어 도메인 지원)
+    const urlRegex = new RegExp(
+      String.raw`(?<!\S)(` +
+        // 1) 선택적 프로토콜
+        String.raw`(https?:\/\/)?` +
+        // 2) 도메인 (유니코드 문자 지원)
+        String.raw`(?:(?:[\p{L}\p{N}\p{So}\p{M}-]+\.)+[\p{L}\p{So}\p{M}]{2,}|(?:\d{1,3}\.){3}\d{1,3})` +
+        // 3) 선택적 경로 (괄호 등 포함)
+        String.raw`(?:\/\S*)?` +
+        // 4) 선택적 쿼리/해시 (괄호 등 포함)
+        String.raw`(?:[?#]\S*)?` +
+      String.raw`)` +
+      String.raw`(?=[\s]|$)`,
+      "giu"
+    );
+
+    // URL 변환 로직
+    return safeText.replace(urlRegex, (match, entireUrl, protocol) => {
+      // 유효성 검사를 위해 도메인 부분만 추출
+      let domainToCheck = entireUrl;
+      if (protocol) {
+        domainToCheck = domainToCheck.slice(protocol.length);
+      }
+
+      // 경로, 쿼리, 해시 제거하여 순수 도메인만 추출
+      const slashIdx = domainToCheck.indexOf('/');
+      let onlyDomain = (slashIdx === -1)
+        ? domainToCheck
+        : domainToCheck.slice(0, slashIdx);
+
+      const qIdx = onlyDomain.indexOf('?');
+      if (qIdx >= 0) {
+        onlyDomain = onlyDomain.slice(0, qIdx);
+      }
+      
+      const hIdx = onlyDomain.indexOf('#');
+      if (hIdx >= 0) {
+        onlyDomain = onlyDomain.slice(0, hIdx);
+      }
+
+      // TLD 검증: 실제 존재하는 TLD인지 확인
+      // 간소화된 구현: 실제로는 TLD 목록을 사용해야 함
+      try {
+        const url = new URL("http://" + onlyDomain);
+        const hostname = url.hostname;
+        const lastDotIndex = hostname.lastIndexOf('.');
+        
+        if (lastDotIndex < 0) return match; // TLD가 없음
+        
+        // TLD 추출
+        const tld = hostname.slice(lastDotIndex + 1).toLowerCase();
+        
+        // 여기서는 TLD 목록 대신 간소화된 확인을 사용
+        // 실제 구현에서는 validTlds.has(tld) || punycodeTlds.has(tld) 사용
+        if (tld.length < 2) return match; // 너무 짧은 TLD는 유효하지 않음
+        
+        // URL에 프로토콜이 있으면 그대로 사용, 없으면 http:// 추가
+        if (protocol) {
+          return `<a target="_blank" href="${entireUrl}" rel="noopener noreferrer">${entireUrl}</a>`;
+        }
+        return `<a target="_blank" href="http://${entireUrl}" rel="noopener noreferrer">${entireUrl}</a>`;
+        
+      } catch (e) {
+        // 유효하지 않은 URL이면 원본 텍스트 반환
+        return match;
+      }
+    });
+  }
   
   // 안전한 요소 선택 (null 체크 포함)
   function safeQuerySelector(selector, parentElement = document) {
@@ -782,6 +863,24 @@ tabElements.forEach(tabElement => {
         }
       }
     });
+  }
+
+  // 모든 더보기 버튼을 확실히 제거하는 함수 추가
+  async function removeAllMoreButtons(container) {
+    try {
+      // 모든 더보기 버튼 요소 찾기 (여러 선택자로 시도)
+      const moreButtons = safeQuerySelectorAll('.replay_inner, .reply_more, a[role="button"].reply_more', container);
+      
+      // 각 버튼 제거
+      for (const button of moreButtons) {
+        await safeRemoveElement(button);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error removing more buttons:', error);
+      return false;
+    }
   }
 
   // 안전한 요소 추가
@@ -863,22 +962,35 @@ tabElements.forEach(tabElement => {
       }
     });
   }
-
-  // Helper function for fetching with retries
+  
+  // 개선된 fetchWithRetry 함수
   async function fetchWithRetry(url, options, retryCount = 0) {
     try {
+      // 요청 시도
       const response = await fetch(url, options);
-      fetchRetryCount = 0;
+      fetchRetryCount = 0; // 성공 시 카운터 초기화
       return response;
     } catch (error) {
       console.error(`Fetch error (attempt ${retryCount + 1}/${MAX_FETCH_RETRIES}):`, error);
       
+      // 재시도 횟수가 최대치보다 적으면 재시도
       if (retryCount < MAX_FETCH_RETRIES) {
-        console.log(`Retrying fetch in ${FETCH_RETRY_DELAY}ms...`);
-        await new Promise(resolve => setTimeout(resolve, FETCH_RETRY_DELAY));
+        // 지수 백오프: 재시도마다 대기 시간 증가
+        const delay = FETCH_RETRY_DELAY * Math.pow(1.5, retryCount);
+        console.log(`Retrying fetch in ${delay}ms...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // 오류 유형에 따른 특별 처리
+        if (error.message && error.message.includes('NetworkError')) {
+          console.warn('NetworkError detected. Check internet connection.');
+        }
+        
+        // 재시도
         return fetchWithRetry(url, options, retryCount + 1);
       }
       
+      // 모든 재시도 실패 후 원래 오류 발생
       throw error;
     }
   }
@@ -2480,6 +2592,96 @@ tabElements.forEach(tabElement => {
     }
   }
 
+  // 게시글 내용 업데이트
+  async function updatePostContent(element, post) {
+    try {
+      if (!element || !document.contains(element)) return;
+      
+      // 내용 업데이트
+      const contentElement = findPostContent(element);
+      if (contentElement && contentElement.textContent !== post.content) {
+        await safeSetTextContent(contentElement, post.content);
+      }
+      
+      // 좋아요 수와 상태 업데이트
+      const likesElement = safeQuerySelector('.like', element);
+      if (likesElement) {
+        const currentLikes = parseInt(likesElement.textContent.match(/\d+/)[0] || '0');
+        const currentLikedState = likesElement.dataset.liked === 'true';
+        
+        // 좋아요 수 업데이트
+        if (currentLikes !== post.likesLength) {
+          await safeSetTextContent(likesElement, `좋아요 ${post.likesLength}`);
+        }
+        
+        // 좋아요 상태 업데이트
+        if (currentLikedState !== post.isLike) {
+          await queueDomOperation(async () => {
+            likesElement.dataset.liked = post.isLike ? 'true' : 'false';
+            if (post.isLike) {
+              likesElement.classList.add('active');
+            } else {
+              likesElement.classList.remove('active');
+            }
+            return true;
+          });
+        }
+      }
+      
+      // 댓글 수 업데이트
+      const replyElement = safeQuerySelector('.reply', element);
+      if (replyElement) {
+        const currentComments = parseInt(replyElement.textContent.match(/\d+/)[0] || '0');
+        if (currentComments !== post.commentsLength) {
+          await safeSetTextContent(replyElement, `댓글 ${post.commentsLength}`);
+        }
+      }
+      
+      // 스티커 업데이트
+      const existingSticker = safeQuerySelector('.css-18ro4ma', element);
+      
+      if (post.sticker) {
+        // 스티커 URL 생성
+        let stickerUrl = '';
+        if (post.sticker.filename) {
+          const firstTwo = post.sticker.filename.substring(0, 2);
+          const secondTwo = post.sticker.filename.substring(2, 4);
+          const filename = post.sticker.filename;
+          const extension = post.sticker.imageType ? `.${post.sticker.imageType.toLowerCase()}` : '';
+          stickerUrl = `/uploads/${firstTwo}/${secondTwo}/${filename}${extension}`;
+          
+          if (existingSticker) {
+            // 기존 스티커 업데이트
+            const imgElement = existingSticker.querySelector('img');
+            if (imgElement && imgElement.src !== stickerUrl) {
+              await queueDomOperation(async () => {
+                imgElement.src = stickerUrl;
+                return true;
+              });
+            }
+          } else {
+            // 새 스티커 추가
+            const stickerContainer = document.createElement('em');
+            stickerContainer.className = 'css-18ro4ma e1877mpo0';
+            stickerContainer.innerHTML = `<img src="${stickerUrl}" alt="sticker">`;
+            
+            if (contentElement) {
+              const contentParent = contentElement.parentElement;
+              if (contentParent) {
+                await safeInsertBefore(contentParent, stickerContainer, contentElement.nextSibling);
+              }
+            }
+          }
+        }
+      } else if (existingSticker) {
+        // 스티커가 없는데 UI에는 있으면 제거
+        await safeRemoveElement(existingSticker);
+      }
+    } catch (error) {
+      console.error('Error in updatePostContent:', error);
+    }
+  }
+
   // 게시글 UI 업데이트 - 수정됨: 게시글 제거 로직 제거
   async function updatePosts(posts, container) {
     try {
@@ -2589,7 +2791,7 @@ tabElements.forEach(tabElement => {
       const likeClass = post.isLike ? 'like active' : 'like';
       
       // 내용 안전하게 이스케이프
-      const safeContent = safeHTML(post.content || '');
+      const safeContent = safeHTMLWithLinks(post.content || '');
       
       // 스티커 HTML 생성
       let stickerHTML = '';
@@ -3263,22 +3465,42 @@ tabElements.forEach(tabElement => {
       
       const data = await response.json();
       
+      // fetchComments 함수 내에서 데이터 처리 부분 수정
       if (data && data.data && data.data.commentList) {
-        const comments = data.data.commentList.list;
+        const newComments = data.data.commentList.list;
         const searchAfter = data.data.commentList.searchAfter;
         const total = data.data.commentList.total;
         
-        // 활성 스레드에 저장
+        // 활성 스레드에 저장 - 여기를 수정
         if (postId in activeCommentThreads) {
           activeCommentThreads[postId].searchAfter = searchAfter;
-          activeCommentThreads[postId].lastCommentsCount = comments.length;
+          
+          // 이 부분이 중요: 댓글을 누적 관리
+          if (!activeCommentThreads[postId].comments) {
+            activeCommentThreads[postId].comments = [];
+          }
+          
+          // 기존 댓글과 새 댓글 병합 (Map 사용해서 중복 제거)
+          const commentsMap = new Map();
+          
+          // 기존 댓글 먼저 Map에 넣기
+          activeCommentThreads[postId].comments.forEach(comment => {
+            commentsMap.set(comment.id, comment);
+          });
+          
+          // 새 댓글 Map에 추가/업데이트
+          newComments.forEach(comment => {
+            commentsMap.set(comment.id, comment);
+          });
+          
+          // Map을 다시 배열로 변환
+          activeCommentThreads[postId].comments = Array.from(commentsMap.values());
+          activeCommentThreads[postId].lastCommentsCount = activeCommentThreads[postId].comments.length;
           activeCommentThreads[postId].total = total;
+          
+          // 누적된 모든 댓글로 UI 업데이트
+          await updateComments(postItem, activeCommentThreads[postId].comments, total > activeCommentThreads[postId].comments.length);
         }
-        
-        // UI에 댓글 업데이트
-        await updateComments(postItem, comments, total > comments.length);
-      } else if (data && data.errors) {
-        console.error('GraphQL errors when fetching comments:', data.errors);
       }
     } catch (error) {
       console.error('Error fetching comments:', error);
@@ -3349,11 +3571,15 @@ tabElements.forEach(tabElement => {
       // 삭제된 댓글 제거
       for (const [commentId, element] of existingCommentsMap.entries()) {
         try {
-          if (!currentCommentIds.has(commentId)) {
+          // 현재 요청에서 없는 댓글이더라도 activeCommentThreads에 있으면 유지
+          const commentExists = currentCommentIds.has(commentId) || 
+                               (activeCommentThreads[postId]?.comments?.some(c => c.id === commentId));
+          
+          if (!commentExists) {
             await safeRemoveElement(element);
           }
         } catch (error) {
-          console.error('Error removing comment:', error);
+          console.error('Error processing existing comment:', error);
         }
       }
       
@@ -3669,19 +3895,36 @@ tabElements.forEach(tabElement => {
       
       const data = await response.json();
       
+      // loadMoreComments 함수에서 데이터 처리 부분 수정
       if (data && data.data && data.data.commentList) {
         const newComments = data.data.commentList.list;
         const searchAfter = data.data.commentList.searchAfter;
         const total = data.data.commentList.total;
         
-        // 활성 스레드에 저장
+        // 활성 스레드에 저장 - 여기를 수정
         if (postId in activeCommentThreads) {
           activeCommentThreads[postId].searchAfter = searchAfter;
-          activeCommentThreads[postId].lastCommentsCount += newComments.length;
+          
+          // 새 댓글 누적 (중복 방지)
+          if (!activeCommentThreads[postId].comments) {
+            activeCommentThreads[postId].comments = [];
+          }
+          
+          // 기존 댓글 ID 추적
+          const existingIds = new Set(activeCommentThreads[postId].comments.map(c => c.id));
+          
+          // 새 댓글 추가 (중복 방지)
+          for (const comment of newComments) {
+            if (!existingIds.has(comment.id)) {
+              activeCommentThreads[postId].comments.push(comment);
+            }
+          }
+          
+          activeCommentThreads[postId].lastCommentsCount = activeCommentThreads[postId].comments.length;
+          
+          // UI에 추가
+          await addMoreComments(postItem, newComments, activeCommentThreads[postId].comments.length < total);
         }
-        
-        // UI에 추가
-        await addMoreComments(postItem, newComments, activeCommentThreads[postId].lastCommentsCount < total);
       }
     } catch (error) {
       console.error('Error loading more comments:', error);
@@ -3732,25 +3975,30 @@ tabElements.forEach(tabElement => {
         }
       }
       
-      // "더 보기" 버튼 업데이트
+      // "더 보기" 버튼 업데이트 - 여기가 중요!
+      // "더 보기" 버튼 업데이트 부분 수정
       const commentsContainer = safeQuerySelector('.css-ahy3yn', commentsDiv);
       if (commentsContainer) {
         try {
-          // 기존 버튼 제거
-          const existingMoreButton = safeQuerySelector('.replay_inner', commentsContainer);
-          if (existingMoreButton) {
-            await safeRemoveElement(existingMoreButton);
-          }
+          // 모든 더보기 버튼 확실히 제거
+          await removeAllMoreButtons(commentsContainer);
           
           // 필요한 경우 새 버튼 추가
           if (hasMore) {
             const moreButton = document.createElement('div');
             moreButton.className = 'replay_inner';
+            moreButton.dataset.customExtension = 'true'; // 데이터셋 추가
             moreButton.innerHTML = '<a href="/" role="button" class="reply_more">답글 더 보기</a>';
-            await safeInsertBefore(commentsContainer, moreButton, commentsContainer.firstChild);
+            
+            // 첫 번째 자식 앞에 삽입
+            if (commentsContainer.firstChild) {
+              await safeInsertBefore(commentsContainer, moreButton, commentsContainer.firstChild);
+            } else {
+              await safeAppendChild(commentsContainer, moreButton);
+            }
           }
         } catch (error) {
-          console.error('Error updating more comments button in addMoreComments:', error);
+          console.error('Error updating more comments button:', error);
         }
       }
     } catch (error) {
