@@ -16,9 +16,6 @@
     /^https:\/\/playentry\.org\/community\?/
   ];
 
-
-
-  
   // 현재 URL이 유효한지 확인
   function isValidPage() {
     const currentUrl = window.location.href;
@@ -186,171 +183,6 @@
     } catch (e) {
       return false;
     }
-  }
-
-  // div.css-1ve7v1a.eq36rvw5 위에 글자를 띄우는 함수
-  function addTextAboveTargetDiv() {
-    // 대상 요소 찾기 - 여러 선택자 시도
-    let targetDiv = document.querySelector('div.css-1ve7v1a.eq36rvw5');
-    
-    // 첫 번째 선택자로 찾지 못하면 다른 선택자들도 시도
-    if (!targetDiv) {
-      const selectors = [
-        'div.css-1ve7v1a',
-        'div[class*="css-1ve7v1a"]',
-        'div[class*="eq36rvw5"]',
-        '.css-1ve7v1a',
-        '.eq36rvw5',
-        'main div:first-child',
-        'main > div',
-        'div.css-1ve7v1a.eq36rvw5'
-      ];
-      
-      for (const selector of selectors) {
-        targetDiv = document.querySelector(selector);
-        if (targetDiv) {
-          console.log(`대상 요소를 선택자 "${selector}"로 찾았습니다.`);
-          break;
-        }
-      }
-    }
-    
-    if (targetDiv) {
-      // 이미 텍스트가 추가되었는지 확인 (중복 방지)
-      const existingText = document.querySelector('#custom-text-above-target');
-      if (existingText) {
-        console.log('이미 텍스트가 추가되어 있습니다.');
-        return;
-      }
-      
-      // 텍스트 요소 생성
-      const textElement = document.createElement('div');
-      textElement.id = 'custom-text-above-target';
-      
-      // HTML 내용 설정 (링크 포함)
-      textElement.innerHTML = `이 확장 프로그램은 폐쇄되었습니다! 대신 <a href="https://chromewebstore.google.com/detail/%EC%97%94%ED%8A%B8%EB%A6%AC-intydse-tyd/efbcdeckfdnjighafklmplnlkjhdggna" target="_blank" rel="noopener noreferrer" style="color: #FFD700; text-decoration: underline; font-weight: bold;">실시간 엔이 V1</a>을 이용해 주세요!`;
-      
-      // 스타일 적용
-      textElement.style.cssText = `
-        background-color: #f44336 !important;
-        color: white !important;
-        padding: 15px 20px !important;
-        margin: 10px 0 !important;
-        border-radius: 5px !important;
-        font-size: 24px !important;
-        font-weight: bold !important;
-        text-align: center !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-        z-index: 9999 !important;
-        position: relative !important;
-        border: 2px solid #d32f2f !important;
-        width: 100% !important;
-        display: block !important;
-      `;
-      
-      // 대상 div 바로 위에 텍스트 삽입
-      if (targetDiv.parentNode) {
-        targetDiv.parentNode.insertBefore(textElement, targetDiv);
-        console.log('폐쇄 안내 텍스트가 성공적으로 추가되었습니다.');
-      } else {
-        // 부모가 없으면 body에 추가
-        document.body.insertBefore(textElement, document.body.firstChild);
-        console.log('폐쇄 안내 텍스트가 body 상단에 추가되었습니다.');
-      }
-      
-      return true; // 성공적으로 추가됨
-    } else {
-      console.log('대상 요소를 찾을 수 없습니다. 나중에 다시 시도합니다.');
-      return false; // 실패
-    }
-  }
-
-  // DOM 변화를 감지하여 텍스트 추가 시도
-  function observeForTextInsertion() {
-    const observer = new MutationObserver((mutations) => {
-      // 이미 텍스트가 추가되었는지 확인
-      if (document.querySelector('#custom-text-above-target')) {
-        return;
-      }
-      
-      // 새로운 노드가 추가되었을 때 텍스트 추가 시도
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          if (addTextAboveTargetDiv()) {
-            observer.disconnect(); // 성공하면 감시 중단
-            return;
-          }
-        }
-      }
-    });
-    
-    // 문서 전체 변화 감시
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    // 10초 후 감시 중단 (리소스 절약)
-    setTimeout(() => {
-      observer.disconnect();
-    }, 10000);
-  }
-
-  // 주기적으로 텍스트 추가 시도
-  function periodicTextInsertion() {
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    const intervalId = setInterval(() => {
-      attempts++;
-      
-      // 이미 성공했거나 최대 시도 횟수에 도달하면 중단
-      if (document.querySelector('#custom-text-above-target') || attempts >= maxAttempts) {
-        clearInterval(intervalId);
-        return;
-      }
-      
-      addTextAboveTargetDiv();
-    }, 1000); // 1초마다 시도
-  }
-
-  // 간단한 백업 방법 - body 상단에 바로 추가
-  function addTextToBodyTop() {
-    // 이미 텍스트가 추가되었는지 확인
-    if (document.querySelector('#custom-text-above-target')) {
-      return;
-    }
-    
-    // 텍스트 요소 생성
-    const textElement = document.createElement('div');
-    textElement.id = 'custom-text-above-target';
-    
-    // HTML 내용 설정 (링크 포함)
-    textElement.innerHTML = `이 확장 프로그램은 폐쇄되었습니다! 대신 <a href="https://chromewebstore.google.com/detail/%EC%97%94%ED%8A%B8%EB%A6%AC-intydse-tyd/efbcdeckfdnjighafklmplnlkjhdggna" target="_blank" rel="noopener noreferrer" style="color: #FFD700; text-decoration: underline; font-weight: bold;">실시간 엔이 V1</a>을 이용해 주세요!`;
-    
-    // 스타일 적용
-    textElement.style.cssText = `
-      background-color: #f44336 !important;
-      color: white !important;
-      padding: 15px 20px !important;
-      margin: 10px 0 !important;
-      border-radius: 5px !important;
-      font-size: 24px !important;
-      font-weight: bold !important;
-      text-align: center !important;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-      z-index: 9999 !important;
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      display: block !important;
-    `;
-    
-    // body에 바로 추가
-    document.body.insertBefore(textElement, document.body.firstChild);
-    console.log('폐쇄 안내 텍스트가 body 상단에 고정으로 추가되었습니다.');
   }
 
   // 스티커 관련 상태 변수
@@ -1315,14 +1147,6 @@ tabElements.forEach(tabElement => {
     if (isInitialized) return; // 이미 초기화된 경우 중복 실행 방지
     
     try {
-      // 폐쇄 안내 텍스트 추가 - 여러 방법으로 시도
-      addTextAboveTargetDiv();
-      
-      // DOM 변화 감지로 텍스트 추가 시도
-      observeForTextInsertion();
-      
-      // 주기적으로 텍스트 추가 시도
-      periodicTextInsertion();
       
       urlParams = new URLSearchParams(window.location.search);
       sortParam = urlParams.get('sort') || 'created';
@@ -5114,31 +4938,11 @@ async function showEditForm(postItem, postId, content) {
     setupUrlChangeListener();
     safeInit();
     
-    // 폐쇄 안내 텍스트 추가 - 즉시 시도 (백업 방법)
-    addTextToBodyTop();
-    
-    // 폐쇄 안내 텍스트 추가 - 추가 시도
-    setTimeout(() => {
-      if (!document.querySelector('#custom-text-above-target')) {
-        addTextToBodyTop();
-        addTextAboveTargetDiv();
-        observeForTextInsertion();
-        periodicTextInsertion();
-      }
-    }, 500);
-    
-    // 더 늦은 시점에서도 한 번 더 시도
-    setTimeout(() => {
-      if (!document.querySelector('#custom-text-above-target')) {
-        addTextToBodyTop();
-        addTextAboveTargetDiv();
-      }
-    }, 2000);
-    
     // 문서가 이미 로드된 상태인지 확인하고 아직 초기화되지 않았으면 다시 시도
     if (document.readyState === 'complete' && !isInitialized) {
       safeInit();
     }
+  } else {
   }
 
   // 댓글 수정 폼 표시 함수

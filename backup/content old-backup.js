@@ -16,9 +16,6 @@
     /^https:\/\/playentry\.org\/community\?/
   ];
 
-
-
-  
   // 현재 URL이 유효한지 확인
   function isValidPage() {
     const currentUrl = window.location.href;
@@ -50,6 +47,7 @@
     }
 
     tldUpdateStatus.isUpdating = true;
+    console.log('Updating TLD list from IANA...');
 
     try {
       // IANA 공식 TLD 리스트 가져오기
@@ -84,6 +82,7 @@
         VALID_TLDS = newTlds;
         tldUpdateStatus.lastUpdate = now;
         tldUpdateStatus.fallbackUsed = false;
+        console.log(`TLD list updated: ${VALID_TLDS.size} TLDs loaded`);
 
         // 로컬 스토리지에 캐시 (선택적)
         try {
@@ -97,6 +96,7 @@
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
+      console.warn('Failed to update TLD list from IANA:', error.message);
       
       // 캐시된 TLD 사용 시도
       try {
@@ -108,11 +108,13 @@
           // 캐시가 1주일 이내면 사용
           if (cacheAge < 7 * 24 * 60 * 60 * 1000) {
             VALID_TLDS = new Set(JSON.parse(cachedTLDs));
+            console.log(`Using cached TLD list: ${VALID_TLDS.size} TLDs`);
             tldUpdateStatus.lastUpdate = now;
             tldUpdateStatus.fallbackUsed = true;
           }
         }
       } catch (cacheError) {
+        console.warn('Failed to load cached TLD list:', cacheError.message);
         tldUpdateStatus.fallbackUsed = true;
       }
     } finally {
@@ -188,171 +190,6 @@
     }
   }
 
-  // div.css-1ve7v1a.eq36rvw5 위에 글자를 띄우는 함수
-  function addTextAboveTargetDiv() {
-    // 대상 요소 찾기 - 여러 선택자 시도
-    let targetDiv = document.querySelector('div.css-1ve7v1a.eq36rvw5');
-    
-    // 첫 번째 선택자로 찾지 못하면 다른 선택자들도 시도
-    if (!targetDiv) {
-      const selectors = [
-        'div.css-1ve7v1a',
-        'div[class*="css-1ve7v1a"]',
-        'div[class*="eq36rvw5"]',
-        '.css-1ve7v1a',
-        '.eq36rvw5',
-        'main div:first-child',
-        'main > div',
-        'div.css-1ve7v1a.eq36rvw5'
-      ];
-      
-      for (const selector of selectors) {
-        targetDiv = document.querySelector(selector);
-        if (targetDiv) {
-          console.log(`대상 요소를 선택자 "${selector}"로 찾았습니다.`);
-          break;
-        }
-      }
-    }
-    
-    if (targetDiv) {
-      // 이미 텍스트가 추가되었는지 확인 (중복 방지)
-      const existingText = document.querySelector('#custom-text-above-target');
-      if (existingText) {
-        console.log('이미 텍스트가 추가되어 있습니다.');
-        return;
-      }
-      
-      // 텍스트 요소 생성
-      const textElement = document.createElement('div');
-      textElement.id = 'custom-text-above-target';
-      
-      // HTML 내용 설정 (링크 포함)
-      textElement.innerHTML = `이 확장 프로그램은 폐쇄되었습니다! 대신 <a href="https://chromewebstore.google.com/detail/%EC%97%94%ED%8A%B8%EB%A6%AC-intydse-tyd/efbcdeckfdnjighafklmplnlkjhdggna" target="_blank" rel="noopener noreferrer" style="color: #FFD700; text-decoration: underline; font-weight: bold;">실시간 엔이 V1</a>을 이용해 주세요!`;
-      
-      // 스타일 적용
-      textElement.style.cssText = `
-        background-color: #f44336 !important;
-        color: white !important;
-        padding: 15px 20px !important;
-        margin: 10px 0 !important;
-        border-radius: 5px !important;
-        font-size: 24px !important;
-        font-weight: bold !important;
-        text-align: center !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-        z-index: 9999 !important;
-        position: relative !important;
-        border: 2px solid #d32f2f !important;
-        width: 100% !important;
-        display: block !important;
-      `;
-      
-      // 대상 div 바로 위에 텍스트 삽입
-      if (targetDiv.parentNode) {
-        targetDiv.parentNode.insertBefore(textElement, targetDiv);
-        console.log('폐쇄 안내 텍스트가 성공적으로 추가되었습니다.');
-      } else {
-        // 부모가 없으면 body에 추가
-        document.body.insertBefore(textElement, document.body.firstChild);
-        console.log('폐쇄 안내 텍스트가 body 상단에 추가되었습니다.');
-      }
-      
-      return true; // 성공적으로 추가됨
-    } else {
-      console.log('대상 요소를 찾을 수 없습니다. 나중에 다시 시도합니다.');
-      return false; // 실패
-    }
-  }
-
-  // DOM 변화를 감지하여 텍스트 추가 시도
-  function observeForTextInsertion() {
-    const observer = new MutationObserver((mutations) => {
-      // 이미 텍스트가 추가되었는지 확인
-      if (document.querySelector('#custom-text-above-target')) {
-        return;
-      }
-      
-      // 새로운 노드가 추가되었을 때 텍스트 추가 시도
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          if (addTextAboveTargetDiv()) {
-            observer.disconnect(); // 성공하면 감시 중단
-            return;
-          }
-        }
-      }
-    });
-    
-    // 문서 전체 변화 감시
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    // 10초 후 감시 중단 (리소스 절약)
-    setTimeout(() => {
-      observer.disconnect();
-    }, 10000);
-  }
-
-  // 주기적으로 텍스트 추가 시도
-  function periodicTextInsertion() {
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    const intervalId = setInterval(() => {
-      attempts++;
-      
-      // 이미 성공했거나 최대 시도 횟수에 도달하면 중단
-      if (document.querySelector('#custom-text-above-target') || attempts >= maxAttempts) {
-        clearInterval(intervalId);
-        return;
-      }
-      
-      addTextAboveTargetDiv();
-    }, 1000); // 1초마다 시도
-  }
-
-  // 간단한 백업 방법 - body 상단에 바로 추가
-  function addTextToBodyTop() {
-    // 이미 텍스트가 추가되었는지 확인
-    if (document.querySelector('#custom-text-above-target')) {
-      return;
-    }
-    
-    // 텍스트 요소 생성
-    const textElement = document.createElement('div');
-    textElement.id = 'custom-text-above-target';
-    
-    // HTML 내용 설정 (링크 포함)
-    textElement.innerHTML = `이 확장 프로그램은 폐쇄되었습니다! 대신 <a href="https://chromewebstore.google.com/detail/%EC%97%94%ED%8A%B8%EB%A6%AC-intydse-tyd/efbcdeckfdnjighafklmplnlkjhdggna" target="_blank" rel="noopener noreferrer" style="color: #FFD700; text-decoration: underline; font-weight: bold;">실시간 엔이 V1</a>을 이용해 주세요!`;
-    
-    // 스타일 적용
-    textElement.style.cssText = `
-      background-color: #f44336 !important;
-      color: white !important;
-      padding: 15px 20px !important;
-      margin: 10px 0 !important;
-      border-radius: 5px !important;
-      font-size: 24px !important;
-      font-weight: bold !important;
-      text-align: center !important;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-      z-index: 9999 !important;
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      display: block !important;
-    `;
-    
-    // body에 바로 추가
-    document.body.insertBefore(textElement, document.body.firstChild);
-    console.log('폐쇄 안내 텍스트가 body 상단에 고정으로 추가되었습니다.');
-  }
-
   // 스티커 관련 상태 변수
   let stickerTabs = [];
   let currentStickerTabId = null;
@@ -377,6 +214,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
     if (csrfToken && xToken) return true;
     await new Promise(r => setTimeout(r, retryDelay));
   }
+  console.error('Tokens still unavailable after retries');
   return false;
 }
 // --- End Patch ---
@@ -425,6 +263,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
   async function fetchStickerTabs() {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for fetchStickerTabs');
         return [];
       }
       
@@ -478,11 +317,14 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
       
       if (data && data.data && data.data.stickers && data.data.stickers.list) {
         stickerTabs = data.data.stickers.list;
+        console.log('스티커 탭 목록 가져옴:', stickerTabs.length);
         return stickerTabs;
       } else {
+        console.error('스티커 탭 데이터 형식 오류:', data);
         return [];
       }
     } catch (error) {
+      console.error('스티커 탭 가져오기 오류:', error);
       return [];
     }
   }
@@ -491,6 +333,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
   async function fetchStickersForTab(tabId) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for fetchStickersForTab');
         return [];
       }
       
@@ -562,6 +405,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
       });
   
       const responseText = await response.text();
+      console.log('스티커 탭 응답:', responseText);
   
       try {
         const data = JSON.parse(responseText);
@@ -569,6 +413,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
         if (data && data.data && data.data.sticker && data.data.sticker.stickers) {
           currentStickers = data.data.sticker.stickers;
           currentStickerTabId = tabId;
+          console.log('탭 스티커 목록 가져옴:', currentStickers.length);
           
           // 각 스티커 ID 문자열로 변환 확인
           currentStickers = currentStickers.map(sticker => {
@@ -580,12 +425,15 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
           
           return currentStickers;
         } else {
+          console.error('스티커 데이터 형식 오류:', data);
           return [];
         }
       } catch (parseError) {
+        console.error('스티커 탭 응답 파싱 오류:', parseError);
         return [];
       }
     } catch (error) {
+      console.error('스티커 목록 가져오기 오류:', error);
       return [];
     }
   }
@@ -608,6 +456,7 @@ async function ensureTokensReady(maxRetries = 3, retryDelay = 300) {
       }
       
       if (stickerTabs.length === 0) {
+        console.error('스티커 탭을 가져올 수 없습니다.');
         return;
       }
       
@@ -810,6 +659,7 @@ tabElements.forEach(tabElement => {
       document.addEventListener('click', handleOutsideStickerClick);
       
     } catch (error) {
+      console.error('스티커 선택기 표시 오류:', error);
     }
   }
 
@@ -891,14 +741,17 @@ tabElements.forEach(tabElement => {
         // 게시글 스티커
         temporaryPostSticker = currentStickerTabId;
         temporaryPostStickerItem = stickerInfo.id;
+        console.log('게시글 스티커 선택됨 - 탭:', temporaryPostSticker, '아이템:', temporaryPostStickerItem);
         await displayTemporaryPostSticker(imageUrl);
       } else {
         // 댓글 스티커
         temporaryCommentSticker = currentStickerTabId;
         temporaryCommentStickerItem = stickerInfo.id;
+        console.log('댓글 스티커 선택됨 - 탭:', temporaryCommentSticker, '아이템:', temporaryCommentStickerItem);
         await displayTemporaryCommentSticker(imageUrl);
       }
     } catch (error) {
+      console.error('스티커 선택 처리 오류:', error);
     }
   }
 
@@ -944,6 +797,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('임시 게시글 스티커 표시 오류:', error);
     }
   }
 
@@ -989,6 +843,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('임시 댓글 스티커 표시 오류:', error);
     }
   }
 
@@ -1006,6 +861,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('임시 게시글 스티커 제거 오류:', error);
     }
   }
 
@@ -1022,6 +878,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('임시 댓글 스티커 제거 오류:', error);
     }
   }
 
@@ -1055,6 +912,7 @@ tabElements.forEach(tabElement => {
         isProcessingDomQueue = false;
       }
     } catch (error) {
+      console.error('DOM operation failed:', error);
       task.reject(error);
       lastDomOperation = Date.now();
       
@@ -1133,15 +991,18 @@ tabElements.forEach(tabElement => {
 
         // 국제화 도메인 검증 사용
         if (!isValidInternationalDomain(onlyDomain)) {
+          console.debug(`Invalid domain rejected: ${onlyDomain}`);
           return match;
         }
 
         // 유효한 도메인인 경우 링크 생성
         const finalUrl = protocol ? cleanUrl : `http://${cleanUrl}`;
         
+        console.debug(`Valid link detected: ${onlyDomain} -> ${finalUrl}`);
         return `<a target="_blank" href="${finalUrl}" rel="noopener noreferrer">${cleanUrl}</a>`;
         
       } catch (e) {
+        console.debug(`URL parsing failed: ${entireUrl}`, e);
         return match;
       }
     });
@@ -1153,6 +1014,7 @@ tabElements.forEach(tabElement => {
       if (!parentElement) return null;
       return parentElement.querySelector(selector);
     } catch (error) {
+      console.error('Error in safeQuerySelector:', error);
       return null;
     }
   }
@@ -1163,6 +1025,7 @@ tabElements.forEach(tabElement => {
       if (!parentElement) return [];
       return Array.from(parentElement.querySelectorAll(selector) || []);
     } catch (error) {
+      console.error('Error in safeQuerySelectorAll:', error);
       return [];
     }
   }
@@ -1179,10 +1042,12 @@ tabElements.forEach(tabElement => {
         }
         return false;
       } catch (error) {
+        console.error('Failed to remove element:', error);
         try {
           element.style.display = 'none';
           return true;
         } catch (hideError) {
+          console.error('Failed to hide element:', hideError);
           return false;
         }
       }
@@ -1202,6 +1067,7 @@ tabElements.forEach(tabElement => {
       
       return true;
     } catch (error) {
+      console.error('Error removing more buttons:', error);
       return false;
     }
   }
@@ -1218,6 +1084,7 @@ tabElements.forEach(tabElement => {
         }
         return false;
       } catch (error) {
+        console.error('Failed to append child:', error);
         return false;
       }
     });
@@ -1237,10 +1104,12 @@ tabElements.forEach(tabElement => {
           return true;
         }
       } catch (error) {
+        console.error('Failed to insert element:', error);
         try {
           parent.appendChild(newElement);
           return true;
         } catch (appendError) {
+          console.error('Failed to append as fallback:', appendError);
           return false;
         }
       }
@@ -1259,6 +1128,7 @@ tabElements.forEach(tabElement => {
         }
         return false;
       } catch (error) {
+        console.error('Failed to set text content:', error);
         return false;
       }
     });
@@ -1276,6 +1146,7 @@ tabElements.forEach(tabElement => {
         }
         return false;
       } catch (error) {
+        console.error('Failed to set innerHTML:', error);
         return false;
       }
     });
@@ -1289,16 +1160,19 @@ tabElements.forEach(tabElement => {
       fetchRetryCount = 0; // 성공 시 카운터 초기화
       return response;
     } catch (error) {
+      console.error(`Fetch error (attempt ${retryCount + 1}/${MAX_FETCH_RETRIES}):`, error);
       
       // 재시도 횟수가 최대치보다 적으면 재시도
       if (retryCount < MAX_FETCH_RETRIES) {
         // 지수 백오프: 재시도마다 대기 시간 증가
         const delay = FETCH_RETRY_DELAY * Math.pow(1.5, retryCount);
+        console.log(`Retrying fetch in ${delay}ms...`);
         
         await new Promise(resolve => setTimeout(resolve, delay));
         
         // 오류 유형에 따른 특별 처리
         if (error.message && error.message.includes('NetworkError')) {
+          console.warn('NetworkError detected. Check internet connection.');
         }
         
         // 재시도
@@ -1315,20 +1189,14 @@ tabElements.forEach(tabElement => {
     if (isInitialized) return; // 이미 초기화된 경우 중복 실행 방지
     
     try {
-      // 폐쇄 안내 텍스트 추가 - 여러 방법으로 시도
-      addTextAboveTargetDiv();
-      
-      // DOM 변화 감지로 텍스트 추가 시도
-      observeForTextInsertion();
-      
-      // 주기적으로 텍스트 추가 시도
-      periodicTextInsertion();
+      console.log('PlayEntry Community Enhancer starting initialization');
       
       urlParams = new URLSearchParams(window.location.search);
       sortParam = urlParams.get('sort') || 'created';
       termParam = urlParams.get('term') || 'all';
       queryParam = urlParams.get('query') || '';
       
+      console.log(`Initializing with params: sort=${sortParam}, term=${termParam}, query=${queryParam ? queryParam : 'none'}`);
       
       // 토큰 추출 시도
       if (extractTokens()) {
@@ -1337,34 +1205,43 @@ tabElements.forEach(tabElement => {
         setupEventListeners();
         isInitialized = true;
         initializationAttempts = 0;
+        console.log('PlayEntry Community Enhancer initialized successfully');
       } else {
         // 토큰 추출 실패시 재시도
         initializationAttempts++;
         if (initializationAttempts < MAX_INIT_ATTEMPTS) {
+          console.log(`Token extraction failed, retry attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS}`);
           // 즉시 재시도
           safeInit();
         } else {
+          console.error('Failed to initialize after maximum attempts');
         }
       }
     } catch (error) {
+      console.error('Error during initialization:', error);
       initializationAttempts++;
       if (initializationAttempts < MAX_INIT_ATTEMPTS) {
+        console.log(`Initialization error, retry attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS}`);
         // 즉시 재시도
         safeInit();
       } else {
+        console.error('Failed to initialize after maximum attempts');
       }
     }
   }
 
   // 토큰 추출
   function extractTokens() {
+    console.log('Extracting tokens...');
     
     try {
       // Get CSRF token
       const metaToken = safeQuerySelector('meta[name="csrf-token"]');
       if (metaToken) {
         csrfToken = metaToken.getAttribute('content');
+        console.log('CSRF token extracted:', csrfToken);
       } else {
+        console.error('CSRF token not found');
         return false;
       }
   
@@ -1393,13 +1270,17 @@ tabElements.forEach(tabElement => {
           xToken = findXToken(data);
           
           if (xToken) {
+            console.log('X token extracted successfully:', xToken.substring(0, 20) + '...');
           } else {
+            console.error('X token not found in data');
             return false;
           }
         } catch (error) {
+          console.error('Error parsing JSON for X token:', error);
           return false;
         }
       } else {
+        console.error('__NEXT_DATA__ element not found');
         return false;
       }
       
@@ -1407,12 +1288,15 @@ tabElements.forEach(tabElement => {
       fetchUserTopics().then(id => {
         if (id) {
           userId = id;
+          console.log('User ID extracted:', userId);
         }
       }).catch(error => {
+        console.error('Error fetching user topics:', error);
       });
       
       return !!(csrfToken && xToken);
     } catch (error) {
+      console.error('Error during token extraction:', error);
       return false;
     }
   }
@@ -1422,10 +1306,12 @@ tabElements.forEach(tabElement => {
     const container = safeQuerySelector('ul.css-1urx3um.e18x7bg03');
     
     if (container) {
+      console.log('Posts container found immediately');
       // 컨테이너를 찾았을 때 즉시 처리
       processFoundContainer(container);
     } else {
       // 컨테이너를 찾지 못했을 때는 MutationObserver로 DOM 변화 감시
+      console.log('Posts container not found immediately, setting up observer');
       observeForPostsContainer();
     }
   }
@@ -1437,6 +1323,7 @@ tabElements.forEach(tabElement => {
         if (mutation.type === 'childList' && mutation.addedNodes.length) {
           const container = safeQuerySelector('ul.css-1urx3um.e18x7bg03');
           if (container) {
+            console.log('Posts container found via observer');
             observer.disconnect();
             processFoundContainer(container);
             return;
@@ -1456,9 +1343,11 @@ tabElements.forEach(tabElement => {
       if (!containerReady) {
         const container = safeQuerySelector('ul.css-1urx3um.e18x7bg03');
         if (container) {
+          console.log('Posts container found via timeout check');
           observer.disconnect();
           processFoundContainer(container);
         } else {
+          console.error('Posts container not found after timeout');
         }
       }
     }, 1000);
@@ -1474,11 +1363,13 @@ tabElements.forEach(tabElement => {
       // 자체적인 컨테이너 생성
       createCustomContainer(container).then(customContainer => {
         if (customContainer) {
+          console.log('Custom container created successfully');
           
           // 토큰 체크 및 게시글 가져오기 시작
           if (csrfToken && xToken) {
             startFetchingPosts(customContainer);
           } else {
+            console.log('Tokens not ready yet, extracting again...');
             extractTokens();
             startFetchingPosts(customContainer);
           }
@@ -1487,8 +1378,10 @@ tabElements.forEach(tabElement => {
           setupContainerObserver(container);
         }
       }).catch(error => {
+        console.error('Error creating custom container:', error);
       });
     } catch (error) {
+      console.error('Error processing found container:', error);
     }
   }
   
@@ -1546,6 +1439,7 @@ tabElements.forEach(tabElement => {
         
         return customContainer;
       } catch (error) {
+        console.error('Error creating custom container:', error);
         return null;
       }
     });
@@ -1556,6 +1450,7 @@ tabElements.forEach(tabElement => {
     const customContainer = safeQuerySelector('#custom-entry-enhancer-container');
     
     if (!customContainer || !document.contains(customContainer)) {
+      console.log('Custom container missing, recreating...');
       await createCustomContainer(originalContainer);
     }
     
@@ -1583,6 +1478,7 @@ tabElements.forEach(tabElement => {
     for (const selector of possibleSelectors) {
       const element = postItem.querySelector(selector);
       if (element) {
+        console.log(`게시글 내용 요소 발견: 선택자 '${selector}' 사용`);
         return element;
       }
     }
@@ -1598,13 +1494,16 @@ tabElements.forEach(tabElement => {
         const divs = Array.from(container.querySelectorAll('div'));
         // 중간 위치의 div(보통 3번째)가 내용인 경우가 많습니다
         if (divs.length >= 3) {
+          console.log('DOM 구조에서 게시글 내용 요소 추정: 구조 기반 탐색');
           return divs[2]; // 대략 3번째 div가 내용일 가능성이 높습니다
         }
       }
     } catch (e) {
+      console.error('DOM 구조 탐색 중 오류:', e);
     }
     
     // 모든 방법이 실패한 경우 null 반환
+    console.error('게시글 내용 요소를 찾을 수 없습니다. DOM 구조가 변경되었을 수 있습니다.');
     return null;
   }
 
@@ -1613,15 +1512,20 @@ tabElements.forEach(tabElement => {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('수정하기 버튼 클릭됨!');
+    console.log('postItem:', postItem);
+    console.log('postId:', postId);
     
     // 개선된 내용 요소 찾기 함수 사용
     const postContentElement = findPostContent(postItem);
     
     if (postContentElement) {
       const postContent = postContentElement.textContent || '';
+      console.log('찾은 게시글 내용:', postContent);
       showEditForm(postItem, postId, postContent);
     } else {
       // 내용 요소를 찾지 못했을 경우에도 빈 내용으로 수정 폼 표시
+      console.warn('게시글 내용을 찾지 못했지만 빈 내용으로 수정 폼을 표시합니다.');
       showEditForm(postItem, postId, '');
     }
   }
@@ -1631,6 +1535,8 @@ tabElements.forEach(tabElement => {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('신고하기 버튼 클릭됨!');
+    console.log('postId:', postId);
     
     // 신고 확인 모달 생성
     showReportConfirmation(postItem, postId);
@@ -1707,6 +1613,7 @@ tabElements.forEach(tabElement => {
         }
       });
     } catch (error) {
+      console.error('Error showing report confirmation:', error);
     }
   }
 
@@ -1759,6 +1666,7 @@ tabElements.forEach(tabElement => {
         if (!actionElement) return;
         
         const action = actionElement.dataset.action;
+        console.log(`직접 액션 감지: ${action}`);
         
         e.preventDefault();
         e.stopPropagation();
@@ -1772,6 +1680,7 @@ tabElements.forEach(tabElement => {
         // 각 액션 별 처리
         switch(action) {
           case 'edit':
+            console.log('수정 액션 실행:', postId);
             const postContentElement = findPostContent(postItem);
             if (postContentElement) {
               showEditForm(postItem, postId, postContentElement.textContent || '');
@@ -1780,20 +1689,25 @@ tabElements.forEach(tabElement => {
             }
             break;
           case 'delete':
+            console.log('삭제 액션 실행:', postId);
             deletePost(postId, postItem);
             break;
           case 'report':
+            console.log('신고 액션 실행:', postId);
             handleReportClick(e, postItem, postId);
             break;
           case 'goto':
+            console.log('게시글로 이동 액션 실행:', postId);
             window.location.href = `https://playentry.org/community/entrystory/${postId}`;
             break;
         }
       });
       
+      console.log('Event listeners setup completed');
       
       window.addEventListener('scroll', handleScrollEvents, { passive: true });
     } catch (error) {
+      console.error('Error in setupEventListeners:', error);
     }
   }
 
@@ -1813,6 +1727,7 @@ tabElements.forEach(tabElement => {
       const gotoButton = li.querySelector('[data-action="goto"]') || 
                          Array.from(li.querySelectorAll('a')).find(el => el.textContent.trim() === '게시글로 이동');
       
+      console.log('찾은 버튼들:', { editButton, deleteButton, reportButton, gotoButton });
       
       // 수정 버튼에 리스너 추가
       if (editButton) {
@@ -1826,6 +1741,7 @@ tabElements.forEach(tabElement => {
         const newClickListener = function(e) {
           e.preventDefault();
           e.stopPropagation();
+          console.log('수정 버튼 직접 클릭됨!');
           handleEditClick(e, li, postId);
         };
         
@@ -1834,6 +1750,7 @@ tabElements.forEach(tabElement => {
         
         editButton.style.cursor = 'pointer';
         editButton.dataset.hasListener = 'true';
+        console.log('수정 버튼에 리스너 추가 완료');
       }
       
       // 삭제 버튼에 리스너 추가
@@ -1848,6 +1765,7 @@ tabElements.forEach(tabElement => {
         const newClickListener = function(e) {
           e.preventDefault();
           e.stopPropagation();
+          console.log('삭제 버튼 직접 클릭됨!');
           deletePost(postId, li);
         };
         
@@ -1856,6 +1774,7 @@ tabElements.forEach(tabElement => {
         
         deleteButton.style.cursor = 'pointer';
         deleteButton.dataset.hasListener = 'true';
+        console.log('삭제 버튼에 리스너 추가 완료');
       }
 
       // 신고 버튼에 리스너 추가
@@ -1870,6 +1789,7 @@ tabElements.forEach(tabElement => {
         const newClickListener = function(e) {
           e.preventDefault();
           e.stopPropagation();
+          console.log('신고 버튼 직접 클릭됨!');
           handleReportClick(e, li, postId);
         };
         
@@ -1878,6 +1798,7 @@ tabElements.forEach(tabElement => {
         
         reportButton.style.cursor = 'pointer';
         reportButton.dataset.hasListener = 'true';
+        console.log('신고 버튼에 리스너 추가 완료');
       }
 
       // 게시글로 이동 버튼에 리스너 추가
@@ -1892,6 +1813,7 @@ tabElements.forEach(tabElement => {
         const newClickListener = function(e) {
           e.preventDefault();
           e.stopPropagation();
+          console.log('게시글로 이동 버튼 직접 클릭됨!');
           window.location.href = `https://playentry.org/community/entrystory/${postId}`;
         };
         
@@ -1900,8 +1822,10 @@ tabElements.forEach(tabElement => {
         
         gotoButton.style.cursor = 'pointer';
         gotoButton.dataset.hasListener = 'true';
+        console.log('게시글로 이동 버튼에 리스너 추가 완료');
       }
     } catch (error) {
+      console.error('버튼 리스너 추가 중 오류:', error);
     }
   }
 
@@ -1922,60 +1846,7 @@ tabElements.forEach(tabElement => {
           (tagName === 'a' && clickedText === '수정하기') ||
           path.some(el => el.textContent && el.textContent.trim() === '수정하기')) {
         
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        
-        // 1단계: 댓글 영역인지 먼저 확인 (가장 가까운 댓글 li 찾기)
-        let commentItem = null;
-        for (const el of path) {
-          if (el.tagName && el.tagName.toLowerCase() === 'li' && el.dataset.commentId) {
-            commentItem = el;
-            break;
-          }
-        }
-        
-        if (commentItem && commentItem.dataset.commentId) {
-          // 댓글 수정 처리
-          const commentId = commentItem.dataset.commentId;
-          
-          // 댓글 내용 찾기
-          const contentElement = commentItem.querySelector('.css-6wq60h');
-          const commentContent = contentElement ? contentElement.textContent : '';
-          
-          showCommentEditForm(commentItem, commentId, commentContent);
-          return;
-        }
-        
-        // 2단계: 댓글이 아니면 게시글 처리
-        let postItem = null;
-        for (const el of path) {
-          if (el.tagName && el.tagName.toLowerCase() === 'li' && el.dataset.postId) {
-            postItem = el;
-            break;
-          }
-        }
-        
-        if (!postItem) {
-          // 대체 방법: 직접 부모 요소 탐색
-          postItem = findClosestPostItem(e.target);
-        }
-        
-        if (postItem && postItem.dataset.postId) {
-          // 게시글 수정 처리
-          const postId = postItem.dataset.postId;
-          
-          handleEditClick(e, postItem, postId);
-        } else {
-        }
-        return; // 이벤트 처리 완료
-      }
-      
-      // "삭제하기" 버튼 클릭 - 모든 가능한 방법으로 감지
-      if (clickedText === '삭제하기' || 
-          (tagName === 'a' && clickedText === '삭제하기') ||
-          path.some(el => el.textContent && el.textContent.trim() === '삭제하기')) {
-        
+        console.log('수정하기 버튼 클릭 감지!');
         e.preventDefault();
         e.stopPropagation(); // 이벤트 전파 중지
         
@@ -1995,12 +1866,49 @@ tabElements.forEach(tabElement => {
         
         if (postItem) {
           const postId = postItem.dataset.postId;
+          console.log('수정 대상 게시글 ID:', postId);
+          
+          handleEditClick(e, postItem, postId);
+        } else {
+          console.error('수정할 게시글을 찾을 수 없습니다.');
+        }
+        return; // 이벤트 처리 완료
+      }
+      
+      // "삭제하기" 버튼 클릭 - 모든 가능한 방법으로 감지
+      if (clickedText === '삭제하기' || 
+          (tagName === 'a' && clickedText === '삭제하기') ||
+          path.some(el => el.textContent && el.textContent.trim() === '삭제하기')) {
+        
+        console.log('삭제하기 버튼 클릭 감지!');
+        e.preventDefault();
+        e.stopPropagation(); // 이벤트 전파 중지
+        
+        // 상위 요소에서 li 요소 찾기
+        let postItem = null;
+        for (const el of path) {
+          if (el.tagName && el.tagName.toLowerCase() === 'li' && el.dataset.postId) {
+            postItem = el;
+            break;
+          }
+        }
+        
+        if (!postItem) {
+          // 대체 방법: 직접 부모 요소 탐색
+          postItem = findClosestPostItem(e.target);
+        }
+        
+        if (postItem) {
+          const postId = postItem.dataset.postId;
+          console.log('삭제 대상 게시글 ID:', postId);
           
           if (postId) {
             deletePost(postId, postItem);
           } else {
+            console.error('삭제할 게시글 ID를 찾을 수 없습니다.');
           }
         } else {
+          console.error('삭제할 게시글을 찾을 수 없습니다.');
         }
         return; // 이벤트 처리 완료
       }
@@ -2015,6 +1923,7 @@ tabElements.forEach(tabElement => {
           e.preventDefault();
           e.stopPropagation(); // 이벤트 전파 중지
           
+          console.log('스티커 버튼 클릭 감지! (커스텀 요소)');
           
           // 게시글 편집인지 댓글인지 확인
           const formType = e.target.closest('.css-1t2q9uf') ? 'post' : 'comment';
@@ -2030,6 +1939,7 @@ tabElements.forEach(tabElement => {
           (tagName === 'a' && clickedText === '신고하기') ||
           path.some(el => el.textContent && el.textContent.trim() === '신고하기')) {
         
+        console.log('신고하기 버튼 클릭 감지!');
         e.preventDefault();
         e.stopPropagation(); // 이벤트 전파 중지
         
@@ -2049,12 +1959,15 @@ tabElements.forEach(tabElement => {
         
         if (postItem) {
           const postId = postItem.dataset.postId;
+          console.log('신고 대상 게시글 ID:', postId);
           
           if (postId) {
             handleReportClick(e, postItem, postId);
           } else {
+            console.error('신고할 게시글 ID를 찾을 수 없습니다.');
           }
         } else {
+          console.error('신고할 게시글을 찾을 수 없습니다.');
         }
         return; // 이벤트 처리 완료
       }
@@ -2064,6 +1977,7 @@ tabElements.forEach(tabElement => {
           (tagName === 'a' && clickedText === '게시글로 이동') ||
           path.some(el => el.textContent && el.textContent.trim() === '게시글로 이동')) {
         
+        console.log('게시글로 이동 버튼 클릭 감지!');
         e.preventDefault();
         e.stopPropagation(); // 이벤트 전파 중지
         
@@ -2083,12 +1997,15 @@ tabElements.forEach(tabElement => {
         
         if (postItem) {
           const postId = postItem.dataset.postId;
+          console.log('이동 대상 게시글 ID:', postId);
           
           if (postId) {
             window.location.href = `https://playentry.org/community/entrystory/${postId}`;
           } else {
+            console.error('이동할 게시글 ID를 찾을 수 없습니다.');
           }
         } else {
+          console.error('이동할 게시글을 찾을 수 없습니다.');
         }
         return; // 이벤트 처리 완료
       }
@@ -2103,11 +2020,13 @@ tabElements.forEach(tabElement => {
         
         // 이미 로딩 중이면 무시
         if (isLoadingMorePosts) {
+          console.log('Already loading more posts, ignoring click');
           e.preventDefault();
           e.stopPropagation();
           return;
         }
         
+        console.log('More posts button clicked - intercepting');
         e.preventDefault();
         e.stopPropagation();
         
@@ -2126,6 +2045,7 @@ tabElements.forEach(tabElement => {
           e.preventDefault();
           e.stopPropagation();
           
+          console.log('Reply button clicked (custom element)');
           
           const postItem = e.target.closest('li');
           if (postItem) {
@@ -2214,6 +2134,7 @@ tabElements.forEach(tabElement => {
         e.preventDefault();
         e.stopPropagation();
         
+        console.log('Options button clicked');
         
         const optionsButton = e.target.matches('.css-9ktsbr') ? e.target : e.target.closest('.css-9ktsbr');
         const optionsMenu = optionsButton.closest('.css-13q8c66')?.querySelector('.css-19v4su1, .css-16el6fj');
@@ -2234,8 +2155,7 @@ tabElements.forEach(tabElement => {
       }
       
       // "수정" 제출 버튼 클릭
-      if ((e.target.textContent === '수정' && e.target.closest('.css-f41j3c')) ||
-          e.target.dataset.btnType === 'comment-edit-submit') {
+      if (e.target.textContent === '수정' || (e.target.closest('a') && e.target.closest('a').textContent === '수정')) {
         // 커스텀 확장에서 생성한 요소인지 확인
         const isCustomElement = e.target.closest('[data-custom-extension="true"]');
         
@@ -2243,15 +2163,14 @@ tabElements.forEach(tabElement => {
           e.preventDefault();
           e.stopPropagation();
           
-          
-          const editForm = e.target.closest('.css-1cyfuwa') || e.target.closest('.css-f41j3c');
+          const editForm = e.target.closest('.css-1t2q9uf');
           if (editForm) {
-            const commentItem = editForm.closest('li');
-            const commentId = commentItem ? commentItem.dataset.commentId : null;
+            const postItem = editForm.closest('li');
+            const postId = postItem.dataset.postId;
             const textareaElement = editForm.querySelector('textarea');
-            if (textareaElement && commentId) {
+            if (textareaElement) {
               const editedContent = textareaElement.value;
-              submitCommentEdit(commentId, editedContent, commentItem);
+              submitEdit(postId, editedContent, postItem);
             }
           }
         }
@@ -2285,18 +2204,27 @@ tabElements.forEach(tabElement => {
         return;
       }
       
-      // 댓글의 "수정하기" 버튼 클릭 처리 (우선순위 높게) - 완전 제거
-      // const commentEditButton = false && e.target.closest('li[data-comment-id] .css-f41j3c a');
-      // if (commentEditButton && (commentEditButton.textContent === '수정하기' || commentEditButton.textContent === '수정')) {
-      //   중복 로직 완전 제거됨
-      // }
+      // 댓글의 "수정하기" 버튼 클릭 처리 (우선순위 높게)
+      const commentEditButton = e.target.closest('li[data-comment-id] .css-f41j3c a');
+      if (commentEditButton && (commentEditButton.textContent === '수정하기' || commentEditButton.textContent === '수정')) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const commentItem = commentEditButton.closest('li[data-comment-id]');
+        if (commentItem) {
+          const commentId = commentItem.dataset.commentId;
+          console.log('댓글 수정 버튼 클릭 - 댓글 ID:', commentId);
+          
+          // 댓글 내용 찾기
+          const contentElement = commentItem.querySelector('.css-6wq60h');
+          const commentContent = contentElement ? contentElement.textContent : '';
+          
+          showCommentEditForm(commentItem, commentId, commentContent);
+        }
+        return;
+      }
       
-      // === 수정 버튼 클릭 감지 (완전히 새로운 통합 로직) - 완전 제거 ===
-      // if (clickedText === '수정하기' || e.target.textContent === '수정하기') {
-      //   중복 로직 완전 제거됨  
-      // }
-      
-      // "수정" 버튼 클릭 (댓글 수정 폼 제출) - 필수 기능 복구
+      // "수정" 버튼 클릭 (댓글 수정 폼 제출)
       if (e.target.textContent === '수정' && e.target.closest('.css-f41j3c')) {
         // 커스텀 확장에서 생성한 요소인지 확인
         const isCustomElement = e.target.closest('[data-custom-extension="true"]');
@@ -2305,13 +2233,12 @@ tabElements.forEach(tabElement => {
           e.preventDefault();
           e.stopPropagation();
           
-          
           const editForm = e.target.closest('.css-1cyfuwa');
           if (editForm) {
             const commentItem = editForm.closest('li');
             const commentId = commentItem.dataset.commentId;
             const textareaElement = editForm.querySelector('textarea');
-            if (textareaElement && commentId) {
+            if (textareaElement) {
               const editedContent = textareaElement.value;
               submitCommentEdit(commentId, editedContent, commentItem);
             }
@@ -2319,7 +2246,29 @@ tabElements.forEach(tabElement => {
         }
         return;
       }
+
+      // 게시글 "수정하기" 버튼 클릭 - 댓글 버튼이 아닌 경우에만
+      if ((clickedText === '수정하기' || (tagName === 'a' && clickedText === '수정하기')) && 
+          !e.target.closest('li[data-comment-id]')) {
+        
+        console.log('게시글 수정하기 버튼 클릭 감지!');
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 게시글 li 찾기
+        const targetItem = e.target.closest('li[data-post-id]') || findClosestPostItem(e.target);
+        
+        if (targetItem && targetItem.dataset.postId) {
+          const postId = targetItem.dataset.postId;
+          console.log('수정 대상 게시글 ID:', postId);
+          handleEditClick(e, targetItem, postId);
+        } else {
+          console.error('수정할 게시글을 찾을 수 없습니다.');
+        }
+        return;
+      }
     } catch (error) {
+      console.error('Error in click event handler:', error);
     }
   }
 
@@ -2350,10 +2299,12 @@ tabElements.forEach(tabElement => {
               rect.bottom <= window.innerHeight
             );
           } catch (rectError) {
+            console.error('Error getting comment section rect:', rectError);
           }
         }
       }
     } catch (error) {
+      console.error('Error in scroll event handler:', error);
     }
   }
 
@@ -2380,17 +2331,21 @@ tabElements.forEach(tabElement => {
               }
             }
           } catch (error) {
+            console.error('Error in main refresh interval:', error);
           }
         }, 3000);
 
         // TLD 리스트 정기 업데이트 (1시간마다)
         setInterval(() => {
           updateTLDList().catch(error => {
+            console.warn('Periodic TLD list update failed:', error);
           });
         }, 60 * 60 * 1000);
       }).catch(error => {
+        console.error('Error in initial fetchPosts:', error);
       });
     } catch (error) {
+      console.error('Error in startFetchingPosts:', error);
     }
   }
 
@@ -2398,6 +2353,7 @@ tabElements.forEach(tabElement => {
   async function fetchUserTopics() {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for fetchUserTopics');
         return '';
       }
       
@@ -2457,6 +2413,7 @@ tabElements.forEach(tabElement => {
       }
       return '';
     } catch (error) {
+      console.error('Error fetching user topics:', error);
       return '';
     }
   }
@@ -2465,10 +2422,12 @@ tabElements.forEach(tabElement => {
   async function fetchPosts(customContainer, isRecentLoad = false) {
     try {
       if (!csrfToken || !xToken || !customContainer) {
+        console.log('Tokens or container not ready, cannot fetch posts');
         return;
       }
 
       // 현재 정렬 매개변수 로깅 (디버깅용)
+      console.log(`fetchPosts 실행: sort=${sortParam}, isRecentLoad=${isRecentLoad}`);
 
       const requestOptions = {
         method: "POST",
@@ -2635,14 +2594,18 @@ tabElements.forEach(tabElement => {
         const response = await fetchWithRetry("https://playentry.org/graphql/SELECT_ENTRYSTORY", requestOptions);
         
         if (!response.ok) {
+          console.error('Server returned an error:', response.status, response.statusText);
           return;
         }
         
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
+          console.error('Response is not JSON, content type:', contentType);
           const textResponse = await response.text();
+          console.error('Response text:', textResponse);
           
           if (textResponse.includes('form tampered with') || textResponse.includes('token')) {
+            console.log('Token issue detected, refreshing tokens...');
             extractTokens();
           }
           return;
@@ -2657,33 +2620,43 @@ tabElements.forEach(tabElement => {
           // currentSearchAfter는 최신 글 로드 시에만 업데이트 (더보기 상태 보존)
           if (isRecentLoad) {
             currentSearchAfter = newSearchAfter;
+            console.log('Updated currentSearchAfter for recent posts:', currentSearchAfter);
           } else {
+            console.log('Preserved currentSearchAfter during refresh:', currentSearchAfter);
           }
           
           // 게시글 순서는 API 응답 그대로 유지 (자연스러운 정렬 순서)
+          console.log(`게시글 정렬: API 응답 순서 그대로 표시 (현재 정렬: ${sortParam})`);
           
           if (JSON.stringify(newPosts) !== JSON.stringify(latestPosts)) {
+            console.log('New posts detected, updating UI');
             
             const postsListContainer = safeQuerySelector('#custom-entry-posts-list', customContainer);
             if (postsListContainer) {
               updatePosts(newPosts, postsListContainer);
               latestPosts = newPosts;
             } else {
+              console.error('Posts list container not found, cannot update posts');
             }
           }
         } else if (data && data.errors) {
+          console.error('GraphQL errors:', data.errors);
         }
       } catch (fetchError) {
+        console.error('Fetch error in fetchPosts:', fetchError);
         
         if (fetchError instanceof SyntaxError) {
+          console.log('JSON parsing error - likely a token issue. Refreshing tokens...');
           extractTokens();
         }
         
         if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
+          console.log('Network error detected - trying to re-initialize...');
           extractTokens();
         }
       }
     } catch (outerError) {
+      console.error('Error in fetchPosts:', outerError);
     }
   }
 
@@ -2691,6 +2664,7 @@ tabElements.forEach(tabElement => {
   async function likePost(postId, element) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for likePost');
         return;
       }
       
@@ -2740,6 +2714,7 @@ tabElements.forEach(tabElement => {
         });
       }
     } catch (error) {
+      console.error('Error liking post:', error);
     }
   }
 
@@ -2747,6 +2722,7 @@ tabElements.forEach(tabElement => {
   async function unlikePost(postId, element) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for unlikePost');
         return;
       }
       
@@ -2796,6 +2772,7 @@ tabElements.forEach(tabElement => {
         });
       }
     } catch (error) {
+      console.error('Error unliking post:', error);
     }
   }
 
@@ -2803,6 +2780,7 @@ tabElements.forEach(tabElement => {
   async function likeComment(commentId, element) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for likeComment');
         return;
       }
       
@@ -2850,6 +2828,7 @@ tabElements.forEach(tabElement => {
         });
       }
     } catch (error) {
+      console.error('Error liking comment:', error);
     }
   }
 
@@ -2857,6 +2836,7 @@ tabElements.forEach(tabElement => {
   async function unlikeComment(commentId, element) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for unlikeComment');
         return;
       }
       
@@ -2904,6 +2884,7 @@ tabElements.forEach(tabElement => {
         });
       }
     } catch (error) {
+      console.error('Error unliking comment:', error);
     }
   }
 
@@ -2928,6 +2909,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('Error in updatePostLikeStatus:', error);
     }
   }
 
@@ -2947,6 +2929,7 @@ tabElements.forEach(tabElement => {
         if (currentContent !== postContent) {
           const newHTML = safeHTMLWithLinks(postContent);
           await safeSetInnerHTML(contentElement, newHTML);
+          console.log('Post content updated with links activated');
         }
       }
       
@@ -3025,6 +3008,7 @@ tabElements.forEach(tabElement => {
         await safeRemoveElement(existingSticker);
       }
     } catch (error) {
+      console.error('Error in updatePostContent:', error);
     }
   }
 
@@ -3033,6 +3017,7 @@ tabElements.forEach(tabElement => {
     try {
       if (!container) return;
       
+      console.log('Updating posts in container with state preservation');
       
       // 현재 스크롤 위치 저장 (화면 이동 방지)
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -3121,6 +3106,7 @@ tabElements.forEach(tabElement => {
       // 보존된 더보기 게시글들 추가
       for (const element of preservedMorePosts) {
         await safeAppendChild(container, element);
+        console.log(`Preserved more post: ${element.dataset.postId}`);
       }
       
       // 스크롤 위치 복원 (화면 이동 방지)
@@ -3129,7 +3115,9 @@ tabElements.forEach(tabElement => {
         window.scrollTo(0, scrollTop);
       }, 0);
       
+      console.log('Posts update completed with state preservation and scroll position maintained');
     } catch (error) {
+      console.error('Error in updatePosts:', error);
     }
   }
   
@@ -3223,6 +3211,7 @@ tabElements.forEach(tabElement => {
       
       return li;
     } catch (error) {
+      console.error('Error in createPostElement:', error);
       // 오류 발생 시 간단한 요소 반환
       const fallbackLi = document.createElement('li');
       fallbackLi.dataset.postId = post.id;
@@ -3236,14 +3225,17 @@ tabElements.forEach(tabElement => {
   async function loadMorePosts() {
     try {
       if (isLoadingMorePosts) {
+        console.log('Already loading more posts, ignoring request');
         return;
       }
       
       if (!currentSearchAfter) {
+        console.log('No more posts to load');
         return;
       }
       
       isLoadingMorePosts = true;
+      console.log('Starting to load more posts...');
       
       const tokensOk = await ensureTokensReady();
       if (!tokensOk) { 
@@ -3416,14 +3408,18 @@ tabElements.forEach(tabElement => {
       const response = await fetchWithRetry("https://playentry.org/graphql/SELECT_ENTRYSTORY", requestOptions);
       
       if (!response.ok) {
+        console.error('Server returned an error:', response.status, response.statusText);
         return;
       }
       
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        console.error('Response is not JSON, content type:', contentType);
         const textResponse = await response.text();
+        console.error('Response text:', textResponse);
         
         if (textResponse.includes('form tampered with') || textResponse.includes('token')) {
+          console.log('Token issue detected, refreshing tokens...');
           extractTokens();
         }
         return;
@@ -3435,6 +3431,9 @@ tabElements.forEach(tabElement => {
         const morePosts = data.data.discussList.list;
         const newSearchAfter = data.data.discussList.searchAfter;
         
+        console.log(`Loaded ${morePosts.length} more posts`);
+        console.log('Previous currentSearchAfter:', currentSearchAfter);
+        console.log('New searchAfter from response:', newSearchAfter);
         
         // currentSearchAfter 업데이트
         currentSearchAfter = newSearchAfter;
@@ -3446,9 +3445,11 @@ tabElements.forEach(tabElement => {
         ]);
         
         const newPosts = morePosts.filter(post => !existingIds.has(post.id));
+        console.log(`Filtered ${newPosts.length} new posts (${morePosts.length - newPosts.length} duplicates removed)`);
         
         // 보이는 게시글 목록에 추가 (누적)
         visibleMorePosts = [...visibleMorePosts, ...newPosts];
+        console.log(`Total visibleMorePosts count: ${visibleMorePosts.length}`);
         
         // UI에 새 게시글 추가
         const customContainer = safeQuerySelector('#custom-entry-posts-list');
@@ -3456,19 +3457,26 @@ tabElements.forEach(tabElement => {
           await addMorePosts(newPosts, customContainer);
         }
         
+        console.log('More posts loaded successfully');
+        console.log('Updated currentSearchAfter:', currentSearchAfter);
       } else if (data && data.errors) {
+        console.error('GraphQL errors:', data.errors);
       }
     } catch (error) {
+      console.error('Error loading more posts:', error);
       
       if (error instanceof SyntaxError) {
+        console.log('JSON parsing error - likely a token issue. Refreshing tokens...');
         extractTokens();
       }
       
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.log('Network error detected - trying to re-initialize...');
         extractTokens();
       }
     } finally {
       isLoadingMorePosts = false;
+      console.log('Loading more posts finished, flag reset');
     }
   }
 
@@ -3491,6 +3499,7 @@ tabElements.forEach(tabElement => {
             existingPostsMap.set(postId, element);
           }
         } catch (error) {
+          console.error('Error mapping existing post for addMorePosts:', error);
         }
       });
       
@@ -3510,6 +3519,7 @@ tabElements.forEach(tabElement => {
             const postElement = createPostElement(post);
             postElement.classList.add('more-section');
             await safeAppendChild(container, postElement);
+            console.log(`더보기 게시글 추가: ${post.id}`);
           } else {
             // 이미 있는 게시글이면 내용 업데이트
             const existingElement = existingPostsMap.get(post.id);
@@ -3522,6 +3532,7 @@ tabElements.forEach(tabElement => {
             await updatePostContent(existingElement, post);
           }
         } catch (error) {
+          console.error('Error adding more post:', error);
         }
       }
       
@@ -3531,7 +3542,9 @@ tabElements.forEach(tabElement => {
         window.scrollTo(0, scrollTop);
       }, 0);
       
+      console.log('More posts added with scroll position preserved');
     } catch (error) {
+      console.error('Error in addMorePosts:', error);
     }
   }
 
@@ -3566,7 +3579,9 @@ tabElements.forEach(tabElement => {
         });
       }
       
+      console.log('더보기 섹션 마커 동기화 완료');
     } catch (error) {
+      console.error('Error in syncMoreSectionMarkers:', error);
     }
   }
 
@@ -3583,6 +3598,7 @@ tabElements.forEach(tabElement => {
         await showComments(postItem, postId);
       }
     } catch (error) {
+      console.error('Error in toggleComments:', error);
     }
   }
 
@@ -3641,6 +3657,7 @@ tabElements.forEach(tabElement => {
         contentContainer.dataset.customExtension = 'true';
         await safeAppendChild(contentContainer, commentsContainer);
       } else {
+        console.error('Cannot find proper container for comments');
       }
       
       // 활성 댓글 스레드 추적
@@ -3659,6 +3676,7 @@ tabElements.forEach(tabElement => {
         window.scrollTo(0, scrollTop);
       }, 0);
     } catch (error) {
+      console.error('Error in showComments:', error);
     }
   }
 
@@ -3689,6 +3707,7 @@ tabElements.forEach(tabElement => {
       if (commentsContainer && commentsContainer.tagName === 'DIV') {
         await safeSetInnerHTML(commentsContainer, '');
       } else {
+        console.error('Cannot find proper comments container to clear');
       }
       
       // 스크롤 위치 복원 (화면 이동 방지)
@@ -3697,6 +3716,7 @@ tabElements.forEach(tabElement => {
         window.scrollTo(0, scrollTop);
       }, 0);
     } catch (error) {
+      console.error('Error in hideComments:', error);
     }
   }
 
@@ -3704,6 +3724,7 @@ tabElements.forEach(tabElement => {
   async function fetchComments(postId, postItem) {
     try {
       if (!csrfToken || !xToken) {
+        console.log('Tokens not ready yet, extracting again...');
         extractTokens();
         return;
       }
@@ -3863,14 +3884,18 @@ tabElements.forEach(tabElement => {
       const response = await fetchWithRetry("https://playentry.org/graphql/SELECT_COMMENTS", requestOptions);
       
       if (!response.ok) {
+        console.error('Server returned an error when fetching comments:', response.status, response.statusText);
         return;
       }
       
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        console.error('Comments response is not JSON, content type:', contentType);
         const textResponse = await response.text();
+        console.error('Comments response text:', textResponse);
         
         if (textResponse.includes('form tampered with') || textResponse.includes('token')) {
+          console.log('Token issue detected, refreshing tokens...');
           extractTokens();
         }
         return;
@@ -3920,19 +3945,23 @@ tabElements.forEach(tabElement => {
             if (hasCommentsSection) {
               await updateComments(postItem, activeCommentThreads[postId].comments, total > activeCommentThreads[postId].comments.length);
             } else {
-              // 댓글 섹션이 열려있지 않을 때는 조용히 스킵 (백그라운드 데이터만 저장)
+              console.warn(`Comments section not open for post ${postId}, skipping UI update`);
             }
           } else {
+            console.warn(`Invalid postItem for post ${postId}, skipping UI update`);
           }
         }
       }
     } catch (error) {
+      console.error('Error fetching comments:', error);
       
       if (error instanceof SyntaxError) {
+        console.log('JSON parsing error in comments - likely a token issue. Refreshing tokens...');
         extractTokens();
       }
       
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.log('Network error detected in comments - trying to re-initialize...');
         extractTokens();
       }
     }
@@ -3942,6 +3971,7 @@ tabElements.forEach(tabElement => {
   async function updateComments(postItem, comments, hasMore) {
     try {
       if (!postItem || !document.contains(postItem)) {
+        console.error('Invalid postItem provided to updateComments');
         return;
       }
 
@@ -3967,6 +3997,7 @@ tabElements.forEach(tabElement => {
       
       // 방법 3: 댓글 섹션이 아직 생성되지 않은 경우
       if (!commentsDiv || !commentsList) {
+        console.warn('Comments container not found - may need to show comments first');
         return;
       }
       
@@ -3980,6 +4011,7 @@ tabElements.forEach(tabElement => {
             existingCommentsMap.set(commentId, element);
           }
         } catch (error) {
+          console.error('Error mapping existing comment:', error);
         }
       });
       
@@ -4000,6 +4032,7 @@ tabElements.forEach(tabElement => {
             await safeAppendChild(commentsList, commentElement);
           }
         } catch (error) {
+          console.error('Error processing comment:', error);
         }
       }
       
@@ -4015,6 +4048,7 @@ tabElements.forEach(tabElement => {
             await safeRemoveElement(element);
           }
         } catch (error) {
+          console.error('Error processing existing comment:', error);
         }
       }
       
@@ -4036,9 +4070,11 @@ tabElements.forEach(tabElement => {
             await safeInsertBefore(commentsContainer, moreButton, commentsContainer.firstChild);
           }
         } catch (error) {
+          console.error('Error updating more comments button:', error);
         }
       }
     } catch (error) {
+      console.error('Error in updateComments:', error);
     }
   }
   
@@ -4057,6 +4093,7 @@ tabElements.forEach(tabElement => {
         if (currentContent !== commentContent) {
           const newHTML = safeHTMLWithLinks(commentContent);
           await safeSetInnerHTML(contentElement, newHTML);
+          console.log('Comment content updated with links activated');
         }
       }
       
@@ -4126,6 +4163,7 @@ tabElements.forEach(tabElement => {
         await safeRemoveElement(existingSticker);
       }
     } catch (error) {
+      console.error('Error in updateCommentContent:', error);
     }
   }
 
@@ -4214,6 +4252,7 @@ tabElements.forEach(tabElement => {
       
       return li;
     } catch (error) {
+      console.error('Error in createCommentElement:', error);
       const fallbackLi = document.createElement('li');
       fallbackLi.dataset.commentId = comment.id;
       fallbackLi.dataset.customExtension = 'true';
@@ -4417,6 +4456,7 @@ tabElements.forEach(tabElement => {
         }
       }
     } catch (error) {
+      console.error('Error loading more comments:', error);
     }
 finally {
       if (activeCommentThreads[postId]) activeCommentThreads[postId].isLoading = false;
@@ -4428,11 +4468,13 @@ finally {
     try {
       const commentsDiv = postItem.children[1];
       if (!commentsDiv || !safeQuerySelector('.css-4e8bhg', commentsDiv)) {
+        console.error('Cannot find comments container for adding more comments');
         return;
       }
       
       const commentsList = safeQuerySelector('.css-1e7cskh', commentsDiv);
       if (!commentsList) {
+        console.error('Cannot find comments list container for adding more comments');
         return;
       }
       
@@ -4446,6 +4488,7 @@ finally {
             existingCommentsMap.set(commentId, element);
           }
         } catch (error) {
+          console.error('Error mapping existing comment for addMoreComments:', error);
         }
       });
       
@@ -4460,6 +4503,7 @@ finally {
             await updateCommentContent(existingCommentsMap.get(comment.id), comment);
           }
         } catch (error) {
+          console.error('Error adding more comment:', error);
         }
       }
       
@@ -4486,15 +4530,19 @@ finally {
             }
           }
         } catch (error) {
+          console.error('Error updating more comments button:', error);
         }
       }
     } catch (error) {
+      console.error('Error in addMoreComments:', error);
     }
   }
 
   // 편집 폼 표시 함수
 async function showEditForm(postItem, postId, content) {
   try {
+    console.log('수정 폼 표시 시작 - 게시글 ID:', postId);
+    console.log('수정할 내용:', content);  // 디버깅용
     
     // content가 undefined나 null이면 빈 문자열로 설정
     content = content || '';
@@ -4530,16 +4578,20 @@ async function showEditForm(postItem, postId, content) {
     
     // 복원을 위해 원래 내용 저장
     postItem.dataset.originalContent = postItem.innerHTML;
+    console.log('원본 내용 저장 완료');
     
     // 게시글 내용을 편집 폼으로 교체
     await safeSetInnerHTML(postItem, '');
+    console.log('기존 내용 지우기 완료');
     
     await queueDomOperation(async () => {
       postItem.className = 'css-15iqo0v e13giesq1';
       return true;
     });
+    console.log('클래스 변경 완료');
     
     await safeAppendChild(postItem, editForm);
+    console.log('편집 폼 추가 완료');
     
     // 스티커 확인 (필요한 경우)
     const post = latestPosts.find(p => p.id === postId) || visibleMorePosts.find(p => p.id === postId);
@@ -4604,6 +4656,7 @@ async function showEditForm(postItem, postId, content) {
       });
     }
   } catch (error) {
+    console.error('Error in showEditForm:', error);
   }
 }
 
@@ -4611,10 +4664,12 @@ async function showEditForm(postItem, postId, content) {
   async function submitEdit(postId, content, postItem) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for submitEdit');
         return;
       }
       
       // 디버깅용 로그 추가
+      console.log('수정 요청 - 스티커 탭:', temporaryPostSticker, '스티커 아이템:', temporaryPostStickerItem);
       
       const requestBody = {
         query: `
@@ -4669,6 +4724,7 @@ async function showEditForm(postItem, postId, content) {
         requestBody.variables.stickerItem = temporaryPostStickerItem;
       }
       
+      console.log('수정 요청 데이터:', JSON.stringify(requestBody));
       
       const response = await fetch("https://playentry.org/graphql/REPAIR_ENTRYSTORY", {
         method: "POST",
@@ -4684,6 +4740,7 @@ async function showEditForm(postItem, postId, content) {
       });
       
       const responseText = await response.text();
+      console.log('수정 응답:', responseText);
       
       try {
         const data = JSON.parse(responseText);
@@ -4751,8 +4808,10 @@ async function showEditForm(postItem, postId, content) {
           temporaryPostStickerItem = null;
         }
       } catch (parseError) {
+        console.error('수정 응답 파싱 오류:', parseError);
       }
     } catch (error) {
+      console.error('Error submitting edit:', error);
       // 원래 게시글 복원
       if (postItem.dataset.originalContent) {
         await safeSetInnerHTML(postItem, postItem.dataset.originalContent);
@@ -4768,9 +4827,13 @@ async function showEditForm(postItem, postId, content) {
   async function deletePost(postId, postItem) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for deletePost');
         return;
       }
       
+      console.log('삭제 요청 시작 - ID:', postId);
+      console.log('삭제 요청 시 CSRF 토큰:', csrfToken.substring(0, 10) + '...');
+      console.log('삭제 요청 시 X 토큰:', xToken.substring(0, 10) + '...');
       
       // GraphQL 요청 데이터 - ID 타입을 ID! (필수)로 변경
       const requestBody = {
@@ -4786,6 +4849,7 @@ async function showEditForm(postItem, postId, content) {
         }
       };
       
+      console.log('삭제 요청 데이터:', JSON.stringify(requestBody));
       
       const response = await fetch("https://playentry.org/graphql/REMOVE_DISCUSS", {
         method: "POST",
@@ -4800,11 +4864,14 @@ async function showEditForm(postItem, postId, content) {
         credentials: "include"
       });
       
+      console.log('삭제 응답 상태:', response.status, response.statusText);
       
       const responseText = await response.text();
+      console.log('삭제 응답 전문:', responseText);
       
       try {
         const data = JSON.parse(responseText);
+        console.log('삭제 응답 파싱된 데이터:', data);
         
         if (data && data.data && data.data.removeDiscuss) {
           // 배열에서 제거
@@ -4813,11 +4880,15 @@ async function showEditForm(postItem, postId, content) {
           
           // UI에서 제거
           await safeRemoveElement(postItem);
+          console.log('게시글 삭제 완료:', postId);
         } else if (data && data.errors) {
+          console.error('삭제 중 GraphQL 오류:', data.errors);
         }
       } catch (parseError) {
+        console.error('삭제 응답 파싱 오류:', parseError);
       }
     } catch (error) {
+      console.error('Error deleting post:', error);
     }
   }
 
@@ -4825,10 +4896,12 @@ async function showEditForm(postItem, postId, content) {
   async function submitComment(postId, content, postItem) {
     try {
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for submitComment');
         return;
       }
       
       // 디버깅용 로그 추가
+      console.log('댓글 작성 요청 - 스티커 탭:', temporaryCommentSticker, '스티커 아이템:', temporaryCommentStickerItem);
       
       const requestBody = {
         query: `
@@ -4893,6 +4966,7 @@ async function showEditForm(postItem, postId, content) {
         requestBody.variables.stickerItem = temporaryCommentStickerItem;
       }
       
+      console.log('댓글 요청 데이터:', JSON.stringify(requestBody));
       
       const response = await fetch("https://playentry.org/graphql/CREATE_COMMENT", {
         method: "POST",
@@ -4908,6 +4982,7 @@ async function showEditForm(postItem, postId, content) {
       });
       
       const responseText = await response.text();
+      console.log('댓글 응답:', responseText);
       
       try {
         const data = JSON.parse(responseText);
@@ -4943,8 +5018,10 @@ async function showEditForm(postItem, postId, content) {
           temporaryCommentStickerItem = null;
         }
       } catch (parseError) {
+        console.error('댓글 응답 파싱 오류:', parseError);
       }
     } catch (error) {
+      console.error('Error submitting comment:', error);
     }
   }
 
@@ -4961,13 +5038,16 @@ async function showEditForm(postItem, postId, content) {
           const url = window.location.href;
           if (url !== lastUrl) {
             lastUrl = url;
+            console.log('URL changed:', url);
             
             // 유효한 페이지인지 확인
             if (!isValidPage()) {
+              console.log('Invalid page, stopping extension');
               stopExtension();
               return;
             }
             
+            console.log('Valid page, resetting extension');
             
             // 초기화 상태 리셋
             isInitialized = false;
@@ -4997,6 +5077,7 @@ async function showEditForm(postItem, postId, content) {
               termParam = newTermParam;
               queryParam = newQueryParam;
               
+              console.log(`URL params updated: sort=${sortParam}, term=${termParam}, query=${queryParam}`);
             }
             
             // DOM 조작 큐 초기화
@@ -5007,6 +5088,7 @@ async function showEditForm(postItem, postId, content) {
             safeInit();
           }
         } catch (error) {
+          console.error('Error in URL change observer callback:', error);
         }
       });
       
@@ -5014,12 +5096,14 @@ async function showEditForm(postItem, postId, content) {
       urlObserver.observe(document, {subtree: true, childList: true});
       observerInitialized = true;
     } catch (error) {
+      console.error('Error setting up URL change listener:', error);
     }
   }
 
   // 확장 프로그램 중지
   function stopExtension() {
     try {
+      console.log('Stopping extension');
       
       // 옵저버 중지
       if (urlObserver) {
@@ -5059,22 +5143,27 @@ async function showEditForm(postItem, postId, content) {
         originalContainer.style.display = '';
       }
       
+      console.log('Extension stopped');
     } catch (error) {
+      console.error('Error stopping extension:', error);
     }
   }
 
   // 안전한 초기화 - 유효한 페이지에서만 실행
   function safeInit() {
     if (!isValidPage()) {
+      console.log('Not a valid page for extension, skipping initialization');
       return;
     }
     
     if (isInitialized) return; // 이미 초기화된 경우 중복 실행 방지
     
     try {
+      console.log('PlayEntry Community Enhancer starting initialization');
       
       // TLD 리스트 업데이트 시작 (비동기)
       updateTLDList().catch(error => {
+        console.warn('TLD list update failed during initialization:', error);
       });
       
       urlParams = new URLSearchParams(window.location.search);
@@ -5082,6 +5171,7 @@ async function showEditForm(postItem, postId, content) {
       termParam = urlParams.get('term') || 'all';
       queryParam = urlParams.get('query') || '';
       
+      console.log(`Initializing with params: sort=${sortParam}, term=${termParam}, query=${queryParam ? queryParam : 'none'}`);
       
       // 토큰 추출 시도
       if (extractTokens()) {
@@ -5090,21 +5180,27 @@ async function showEditForm(postItem, postId, content) {
         setupEventListeners();
         isInitialized = true;
         initializationAttempts = 0;
+        console.log('PlayEntry Community Enhancer initialized successfully');
       } else {
         // 토큰 추출 실패시 재시도
         initializationAttempts++;
         if (initializationAttempts < MAX_INIT_ATTEMPTS) {
+          console.log(`Token extraction failed, retry attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS}`);
           // 즉시 재시도
           safeInit();
         } else {
+          console.error('Failed to initialize after maximum attempts');
         }
       }
     } catch (error) {
+      console.error('Error during initialization:', error);
       initializationAttempts++;
       if (initializationAttempts < MAX_INIT_ATTEMPTS) {
+        console.log(`Initialization error, retry attempt ${initializationAttempts}/${MAX_INIT_ATTEMPTS}`);
         // 즉시 재시도
         safeInit();
       } else {
+        console.error('Failed to initialize after maximum attempts');
       }
     }
   }
@@ -5114,36 +5210,20 @@ async function showEditForm(postItem, postId, content) {
     setupUrlChangeListener();
     safeInit();
     
-    // 폐쇄 안내 텍스트 추가 - 즉시 시도 (백업 방법)
-    addTextToBodyTop();
-    
-    // 폐쇄 안내 텍스트 추가 - 추가 시도
-    setTimeout(() => {
-      if (!document.querySelector('#custom-text-above-target')) {
-        addTextToBodyTop();
-        addTextAboveTargetDiv();
-        observeForTextInsertion();
-        periodicTextInsertion();
-      }
-    }, 500);
-    
-    // 더 늦은 시점에서도 한 번 더 시도
-    setTimeout(() => {
-      if (!document.querySelector('#custom-text-above-target')) {
-        addTextToBodyTop();
-        addTextAboveTargetDiv();
-      }
-    }, 2000);
-    
     // 문서가 이미 로드된 상태인지 확인하고 아직 초기화되지 않았으면 다시 시도
     if (document.readyState === 'complete' && !isInitialized) {
+      console.log('Document already loaded but not initialized, trying again');
       safeInit();
     }
+  } else {
+    console.log('Not a valid page for extension');
   }
 
   // 댓글 수정 폼 표시 함수
   async function showCommentEditForm(commentItem, commentId, content) {
     try {
+      console.log('댓글 수정 폼 표시 시작 - 댓글 ID:', commentId);
+      console.log('수정할 내용:', content);
       
       // content가 undefined나 null이면 빈 문자열로 설정
       content = content || '';
@@ -5175,7 +5255,7 @@ async function showEditForm(postItem, postId, content) {
               </label>
             </div>
             <span class="css-11ofcmn e1h77j9v8" data-custom-extension="true">
-              <a href="#" data-btn-type="comment-edit-submit" data-testid="button" class="css-1adjw8a e13821ld2" data-custom-extension="true">수정</a>
+              <a href="/" data-btn-type="login" data-testid="button" class="css-1adjw8a e13821ld2" data-custom-extension="true">수정</a>
             </span>
           </div>
         </div>
@@ -5183,48 +5263,28 @@ async function showEditForm(postItem, postId, content) {
       
       // 복원을 위해 원래 내용 저장
       commentItem.dataset.originalContent = commentItem.innerHTML;
+      console.log('원본 댓글 내용 저장 완료');
       
       // 댓글 내용을 수정 폼으로 교체
       await safeSetInnerHTML(commentItem, '');
+      console.log('기존 댓글 내용 지우기 완료');
       
       await safeAppendChild(commentItem, editForm);
-      
-      // 수정 버튼에 직접 이벤트 리스너 추가
-      const submitButton = editForm.querySelector('[data-btn-type="comment-edit-submit"]');
-      const textarea = editForm.querySelector('textarea');
-      
-      if (submitButton && textarea) {
-        submitButton.addEventListener('click', async function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const editedContent = textarea.value;
-          
-          await submitCommentEdit(commentId, editedContent, commentItem);
-        });
-        
-        // 취소 기능을 위한 ESC 키 이벤트
-        textarea.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape') {
-            // 원래 내용으로 복원
-            if (commentItem.dataset.originalContent) {
-              safeSetInnerHTML(commentItem, commentItem.dataset.originalContent);
-              delete commentItem.dataset.originalContent;
-            }
-          }
-        });
-        
-      }
+      console.log('댓글 수정 폼 추가 완료');
       
     } catch (error) {
+      console.error('Error in showCommentEditForm:', error);
     }
   }
 
   // 댓글 수정 제출 함수
   async function submitCommentEdit(commentId, content, commentItem) {
     try {
+      console.log('댓글 수정 제출 시작 - 댓글 ID:', commentId);
+      console.log('수정된 내용:', content);
       
       if (!csrfToken || !xToken) {
+        console.error('Tokens not available for submitCommentEdit');
         return;
       }
       
@@ -5367,6 +5427,7 @@ async function showEditForm(postItem, postId, content) {
         requestBody.variables.stickerItem = temporaryCommentStickerItem;
       }
       
+      console.log('댓글 수정 요청 데이터:', JSON.stringify(requestBody));
       
       const response = await fetch("https://playentry.org/graphql/REPAIR_COMMENT", {
         method: "POST",
@@ -5382,28 +5443,25 @@ async function showEditForm(postItem, postId, content) {
       });
       
       const responseText = await response.text();
+      console.log('댓글 수정 응답:', responseText);
       
       try {
         const data = JSON.parse(responseText);
         
         if (data && data.data && data.data.repairComment) {
+          console.log('댓글 수정 성공!');
           
           // 수정된 댓글로 UI 업데이트
           const updatedComment = data.data.repairComment;
-          
-          // 수정 폼을 제거하고 새로운 댓글 요소로 교체
-          const newCommentElement = createCommentElement(updatedComment);
-          
-          // 기존 댓글 요소(수정 폼)를 새로운 댓글 요소로 교체
-          if (commentItem.parentNode) {
-            commentItem.parentNode.replaceChild(newCommentElement, commentItem);
-          }
+          await updateCommentContent(commentItem, updatedComment);
           
           // 임시 스티커 상태 초기화
           temporaryCommentSticker = null;
           temporaryCommentStickerItem = null;
           
+          console.log('댓글 수정 완료 및 UI 업데이트됨');
         } else if (data && data.errors) {
+          console.error('댓글 수정 GraphQL 오류:', data.errors);
           
           // 오류 시 원래 내용으로 복원
           if (commentItem.dataset.originalContent) {
@@ -5412,6 +5470,7 @@ async function showEditForm(postItem, postId, content) {
           }
         }
       } catch (parseError) {
+        console.error('댓글 수정 응답 파싱 오류:', parseError);
         
         // 오류 시 원래 내용으로 복원
         if (commentItem.dataset.originalContent) {
@@ -5420,23 +5479,13 @@ async function showEditForm(postItem, postId, content) {
         }
       }
     } catch (error) {
+      console.error('Error submitting comment edit:', error);
       
       // 오류 시 원래 내용으로 복원
       if (commentItem.dataset.originalContent) {
         await safeSetInnerHTML(commentItem, commentItem.dataset.originalContent);
         delete commentItem.dataset.originalContent;
       }
-    }
-  }
-
-  // 초기화 즉시 시작 - 유효한 페이지에서만
-  if (isValidPage()) {
-    setupUrlChangeListener();
-    safeInit();
-    
-    // 문서가 이미 로드된 상태인지 확인하고 아직 초기화되지 않았으면 다시 시도
-    if (document.readyState === 'complete' && !isInitialized) {
-      safeInit();
     }
   }
 })();
